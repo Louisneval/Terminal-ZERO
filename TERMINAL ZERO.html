@@ -1,0 +1,1754 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>TERMINAL ZERO</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Caveat:wght@500;700&display=swap">
+<style>
+/* Layout: night-city style top-down facility map (left), terminal (right), six-cell world-state strip (bottom). One committed dark look. */
+:root{
+  --bg:#080b10; --panel:#0b1016; --line:#1c2631; --line2:#2a3744; --fg:#d9dfe5; --dim:#7a8794;
+  --green:#38d27f; --teal:#5fb8c8; --amber:#e3b552; --red:#e5594f; --violet:#a58ae0; --blue:#6cc0d8;
+  --font:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px;overflow-x:hidden}
+#app{height:100%;min-height:600px;display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);grid-template-rows:minmax(0,1fr) auto;gap:14px}
+.pane{background:var(--panel);border:1px solid var(--line2);border-radius:3px;min-width:0;min-height:0;position:relative;overflow:hidden}
+#world{background:#0f151d}
+#map{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:default}
+#maptitle{position:absolute;left:10px;top:10px;padding:3px 12px;background:rgba(8,12,16,.92);border:1px solid #1f5a3b;color:var(--green);font-size:16px;border-radius:2px;pointer-events:none}
+#menubtn{position:absolute;right:10px;top:10px;padding:3px 12px;background:rgba(8,12,16,.92);border:1px solid var(--line2);color:var(--fg);font:inherit;font-size:14px;border-radius:2px;cursor:pointer}
+#menubtn:hover,#menubtn:focus-visible{border-color:var(--green);color:var(--green);outline:0}
+#menu{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:rgba(5,8,12,.8);backdrop-filter:blur(3px)}
+#menu[hidden]{display:none}
+#menu .box{width:min(460px,100%);background:var(--panel);border:1px solid var(--line2);border-radius:3px;padding:34px 32px 26px}
+#menu h1{margin:0;font-size:30px;line-height:1.1;font-weight:600;letter-spacing:.1em;color:#fff;text-wrap:balance}
+#menu h1 i{font-style:normal;color:var(--green)}
+#menu .sub{margin:10px 0 28px;color:var(--dim);font-size:13px}
+#menu button.opt{display:block;width:100%;text-align:left;margin-top:10px;padding:14px 18px;background:transparent;border:1px solid var(--line2);border-radius:2px;color:var(--fg);font:inherit;font-size:16px;cursor:pointer}
+#menu button.opt::before{content:"> ";color:var(--green)}
+#menu button.opt:hover:not(:disabled),#menu button.opt:focus-visible{border-color:var(--green);background:rgba(56,210,127,.07);outline:0}
+#menu button.opt:disabled{opacity:.4;cursor:not-allowed}
+#menu button.opt.warn{border-color:var(--amber);color:var(--amber)}
+#menu .info{margin:6px 2px 0;font-size:12px;color:var(--dim);min-height:1.5em}
+#menu .foot{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+#menu .foot b{font-weight:400;color:var(--teal)}
+#term{display:flex;flex-direction:column}
+#out{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:20px 24px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.46;scrollbar-width:thin;scrollbar-color:#25323f transparent}
+#out .l{min-height:1.46em}
+#out .echo .ps{color:var(--green)}
+#out .hc{color:var(--green)}
+.c-dim{color:var(--dim)}.c-ok{color:var(--green)}.c-warn{color:var(--amber)}.c-err{color:var(--red)}.c-sys{color:var(--blue)}.c-msg{color:var(--violet)}.c-hd{color:#fff;font-weight:600}.c-box{color:var(--amber);font-weight:600}
+#cmdline{position:relative;display:flex;flex-wrap:wrap;align-items:baseline;cursor:text;min-height:1.46em}
+#cmdline .ps{color:var(--green);white-space:pre}
+#cmdline .typed{white-space:pre-wrap;overflow-wrap:anywhere}
+#cmdline .cur{display:inline-block;width:.6em;height:1.1em;background:var(--green);transform:translateY(.2em);animation:blink 1.1s steps(1) infinite}
+#in{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;border:0;padding:0;background:transparent;color:transparent;font:inherit}
+#intro{position:fixed;inset:0;z-index:60;background:#05080c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:max(12px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));cursor:pointer;user-select:none}
+#intro[hidden]{display:none}
+#intro .stage{position:relative;width:min(100%,calc((100vh - 210px)*16/9),980px);aspect-ratio:16/9;border:1px solid var(--line2);background:#000}
+#ic{width:100%;height:100%;display:block;image-rendering:pixelated}
+#icard{position:absolute;inset:0;display:grid;place-content:center;gap:10px;text-align:center;background:#05080c;opacity:0;pointer-events:none;transition:opacity .6s}
+#icard.on{opacity:1}
+#icard b{font-size:clamp(22px,4.4vw,40px);letter-spacing:.14em;color:#fff;font-weight:600}
+#icard span{font-size:clamp(13px,2vw,18px);color:var(--amber);letter-spacing:.06em}
+#dlg{width:min(100%,980px);min-height:118px;padding:14px 20px;background:var(--panel);border:1px solid var(--line2);border-radius:3px;position:relative}
+#dwho{font-size:13px;letter-spacing:.1em;min-height:1.4em}
+#dtxt{font-size:clamp(14px,1.9vw,17px);line-height:1.5;margin-top:4px;text-wrap:pretty}
+#dtxt.narr{color:var(--dim);font-style:italic}
+#dhint{position:absolute;right:16px;bottom:10px;font-size:12px;color:var(--green);visibility:hidden;animation:blink 1.1s steps(1) infinite}
+#iskip{position:absolute;right:10px;top:10px;padding:3px 12px;background:rgba(8,12,16,.92);border:1px solid var(--line2);color:var(--fg);font:inherit;font-size:13px;border-radius:2px;cursor:pointer;z-index:2}
+#iskip:hover,#iskip:focus-visible{border-color:var(--green);color:var(--green);outline:0}
+#quick{display:flex;gap:8px;overflow-x:auto;padding:8px 12px;border-top:1px solid var(--line);scrollbar-width:none;flex:none}
+#quick::-webkit-scrollbar{display:none}
+#quick button{flex:none;padding:9px 14px;background:transparent;border:1px solid var(--line2);border-radius:2px;color:var(--fg);font:inherit;font-size:14px;cursor:pointer;touch-action:manipulation}
+#quick button.ctx{border-color:#2c5a45;color:var(--green)}
+#quick button:active,#quick button:focus-visible{border-color:var(--green);outline:0;background:rgba(56,210,127,.08)}
+#quick .sep{flex:none;width:1px;background:var(--line2)}
+@media (pointer:coarse){#out{font-size:14px;padding:14px 16px}#menubtn,#iskip{padding:8px 14px}}
+#nbbtn{position:absolute;right:84px;top:10px;padding:3px 12px;background:rgba(8,12,16,.92);border:1px solid var(--line2);color:var(--amber);font:inherit;font-size:14px;border-radius:2px;cursor:pointer}
+#nbbtn:hover,#nbbtn:focus-visible{border-color:var(--amber);outline:0}
+#nb{position:absolute;left:10px;top:52px;bottom:auto;width:min(330px,calc(100% - 20px));max-height:calc(100% - 140px);display:flex;flex-direction:column;z-index:5;background:#e8dec0;color:#2b2418;border:1px solid #b8a97c;border-left:14px solid #6b3b2a;border-radius:2px;box-shadow:0 8px 28px rgba(0,0,0,.55);transform:rotate(-.6deg);background-image:repeating-linear-gradient(transparent 0 25px,rgba(70,100,150,.22) 25px 26px)}
+#nb[hidden]{display:none}
+#nb header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:10px 12px 4px;font-family:"Caveat","Bradley Hand",cursive;font-size:28px;line-height:1;color:#7a1f1a}
+#nb header small{font-family:var(--font);font-size:12px;color:#5a4d34}
+#nbclose{background:none;border:0;color:#5a4d34;font:inherit;font-size:20px;cursor:pointer;padding:0 4px}
+#nbbody{overflow-y:auto;padding:4px 12px 14px;font-family:"Caveat","Bradley Hand",cursive;font-size:21px;line-height:26px}
+.nbg{margin-top:10px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;font-family:var(--font);color:#7a1f1a;line-height:26px}
+.nbi{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.nbi .bx{flex:none;width:22px}
+.nbi .tx{flex:1 1 150px;min-width:0}
+.nbi.done .tx{text-decoration:line-through;color:#7a7058}
+.nbi.dim .tx{opacity:.65}
+.nbw{margin-left:30px;margin-bottom:2px;background:rgba(122,31,26,.08);border:1px dashed #7a1f1a;color:#7a1f1a;font:inherit;font-family:var(--font);font-size:12px;line-height:18px;padding:0 8px;border-radius:2px;cursor:pointer}
+.nbw:hover,.nbw:focus-visible{background:rgba(122,31,26,.18);outline:0}
+@media (max-width:860px){#nb{position:fixed;left:12px;right:12px;top:64px;width:auto;max-height:calc(100dvh - 140px);z-index:40}#nbbtn{right:76px}}
+@keyframes blink{50%{opacity:0}}
+#status{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.6fr 1.15fr 1.35fr .95fr 1.5fr;border:1px solid var(--line2);border-radius:3px;background:var(--panel)}
+.cell{display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;padding:14px 16px;min-width:0;border-left:1px solid var(--line)}
+.cell:first-child{border-left:0}
+.cell svg{width:26px;height:26px;stroke:var(--teal);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin-top:2px}
+.cell .lb{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--teal);margin-bottom:5px}
+.cell .v{overflow-wrap:anywhere}
+.cell .s{font-size:12px;color:var(--dim);overflow-wrap:anywhere}
+#clock{font-size:28px;line-height:1.15;letter-spacing:.02em;color:#fff}
+.susp{display:flex;align-items:center;gap:12px;margin-top:8px}
+.meter{flex:1;height:8px;background:#16202a;border-radius:1px;overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--teal);transition:width .3s,background .3s}
+#evl,#evt{list-style:none;margin:0;padding:0;font-size:13px}
+#evl li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c3ccd4}
+#evl li::before{content:"\2022";color:var(--dim);margin-right:8px}
+#evt li{display:flex;gap:10px;white-space:nowrap;color:#c3ccd4}
+#evt li b{font-weight:400;color:var(--dim);flex:none}
+#evt li span{overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1100px){#status{grid-template-columns:repeat(3,minmax(0,1fr))}.cell:nth-child(4){border-left:0}.cell:nth-child(n+4){border-top:1px solid var(--line)}}
+@media (max-width:860px){
+  #app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(420px,70vh) auto;height:auto}
+  #world{aspect-ratio:720/600}#maptitle{display:none}
+}
+@media (max-width:620px){#status{grid-template-columns:repeat(2,minmax(0,1fr))}.cell:nth-child(odd){border-left:0}.cell:nth-child(n+3){border-top:1px solid var(--line)}.cell:nth-child(4){border-left:1px solid var(--line)}}
+@media (prefers-reduced-motion:reduce){#cmdline .cur,#dhint{animation:none}#icard{transition:none}.meter i{transition:none}}
+</style>
+
+<div id="app">
+  <section class="pane" id="world">
+    <canvas id="map" aria-label="City map. Click a building to observe it, a person to inspect them."></canvas>
+    <div id="maptitle">Harbor City · Dock Street</div>
+    <button id="nbbtn" type="button" aria-expanded="false" aria-controls="nb">Notebook</button>
+    <button id="menubtn" type="button">Menu</button>
+    <aside id="nb" hidden aria-label="Detective notebook"><header><span>To do <small id="nbcount"></small></span><button id="nbclose" type="button" aria-label="Close notebook">×</button></header><div id="nbbody"></div></aside>
+  </section>
+  <section class="pane" id="term">
+    <div id="out" role="log" aria-live="polite">
+      <label id="cmdline"><span class="ps" id="ps">user@world:~$ </span><span class="typed" id="typed"></span><span class="cur" id="cur"></span><input id="in" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal input"></label>
+    </div>
+    <div id="quick" aria-label="Quick commands"></div>
+  </section>
+  <section id="status">
+    <div class="cell"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg><div><div id="clock">09:55</div><div class="s" id="date">Fri, Oct 30, 2026</div></div></div>
+    <div class="cell"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><div><div class="lb">Current mission</div><div class="v" id="task">-</div><div class="s">Case #001: The Missing Reporter</div></div></div>
+    <div class="cell"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v5M12 17.5v.5"/></svg><div><div class="lb">Suspicion level</div><div class="susp"><div class="meter"><i id="suspbar"></i></div><span id="suspn">0%</span></div></div></div>
+    <div class="cell"><svg viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v8.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg><div><div class="lb">Known evidence <span id="evn" style="color:var(--dim)"></span></div><ul id="evl"></ul></div></div>
+    <div class="cell"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg><div><div class="lb">Mission status</div><div class="v" id="mstat">-</div><div class="s" id="mphase"></div></div></div>
+    <div class="cell"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg><div><div class="lb">World events</div><ul id="evt"></ul></div></div>
+  </section>
+</div>
+<div id="menu" role="dialog" aria-modal="true" aria-labelledby="mt">
+  <div class="box">
+    <h1 id="mt">TERMINAL<i>:</i> ZERO</h1>
+    <p class="sub">Command-line detective noir. Case #001: The Missing Reporter.</p>
+    <button class="opt" id="bnew" type="button">Start new game</button>
+    <div class="info" id="newinfo"></div>
+    <button class="opt" id="bcont" type="button" disabled>Continue saved game</button>
+    <div class="info" id="continfo">Looking for a saved game...</div>
+    <div class="foot" id="cloudinfo">Progress is saved automatically in this browser.</div>
+  </div>
+</div>
+<div id="intro" hidden><button id="iskip" type="button">Skip intro</button><div class="stage"><canvas id="ic" width="720" height="405" aria-label="Opening scene in John Miller's office"></canvas><div id="icard"></div></div><div id="dlg" aria-live="polite"><div id="dwho"></div><div id="dtxt"></div><div id="dhint">Click or Enter ▶</div></div></div>
+<script>
+'use strict';
+/* ===== STORY DATA: CASE #001 "THE CARTER FILE" (add new cases by adding data like this) ===== */
+const T=s=>{const [h,m]=s.split(':').map(Number);return h*60+m};
+const fmt=t=>{t=Math.floor(t);return String(Math.floor(t/60)%24).padStart(2,'0')+':'+String(t%60).padStart(2,'0')};
+let START=T('09:55');
+/* zone = building; travel inside a zone is quick, between zones takes longer */
+const ROOMS={
+  street:{dir:'street',name:'DOWNTOWN STREET',zone:'street'},
+  agency:{dir:'agency',name:'MILLER INVESTIGATIONS',zone:'agency'},
+  lobby:{dir:'lobby',name:'BENNETT BUILDING: LOBBY',zone:'bennett'},
+  news:{dir:'newsroom',name:'BENNETT BUILDING: NEWSROOM',zone:'bennett'},
+  base:{dir:'basement',name:'BENNETT BUILDING: BASEMENT',zone:'bennett'},
+  apt:{dir:'apartment',name:'CARTER APARTMENT',zone:'apt'},
+  diner:{dir:'diner',name:"ROSIE'S DINER",zone:'diner'},
+  away:{dir:null,name:'ELSEWHERE',zone:'away'}
+};
+const DIR2ROOM={};Object.keys(ROOMS).forEach(k=>{if(ROOMS[k].dir)DIR2ROOM[ROOMS[k].dir]=k});
+const HERO={name:'John Miller',role:'Private detective',col:'#b08a5a'};
+const NPCS={
+ emily:{name:'Emily Carter',role:'Client, Michael\'s sister',col:'#c8564e',ini:'E',trust:60,
+  sched:[['00:00','agency'],['09:50','street'],['10:10','apt'],['13:30','away'],['16:00','agency']],
+  bio:'Michael\'s younger sister. A schoolteacher. Tired eyes, steady voice. She has not slept properly in five days.',
+  topics:[
+   {k:'michael',label:'About Michael',say:['He is the stubborn one. He once drove four hours to correct a typo in a headline.','He is not a man who just disappears.']},
+   {k:'harris',label:'Detective Harris',say:['Harris said grown men leave town every day. He did not even visit Michael\'s desk.']},
+   {k:'bennett',label:'Richard Bennett',say:['Bennett owns the building. Michael called him "the man who owns half the waterfront".','He never said why. He just stopped joking about it.']},
+   {k:'threat',label:'Anything strange lately?',when:()=>has('answering_machine'),say:['Someone called my flat on Wednesday. Silence, then a click.','I did not want to tell you. I thought you would think I was imagining it.'],fx:()=>secret('emily_call')}
+  ]},
+ parker:{name:'James Parker',role:'Night and day guard',col:'#35598f',ini:'J',trust:30,
+  sched:[['00:00','away'],['08:00','lobby'],['12:30','diner'],['13:15','lobby'],['19:00','away']],
+  bio:'Heavy-set guard, twenty years on the Bennett payroll. Calls everyone "pal". Does not like questions about his log.',
+  topics:[
+   {k:'michael',label:'Michael Carter',say:['Carter? Third floor reporter. Left at seven-twenty Tuesday, same as always. Signed the book.','Haven\'t seen him since.'],fx:()=>{S.flags.parker_story=1}},
+   {k:'badge',label:'Ask for a visitor badge',say:['Reporter\'s friend, huh? Fine. Sign here and keep it on your lapel.','Third floor and back. Not one step farther.'],fx:()=>{S.flags.pass=1;trust('parker',3)},once:'pass'},
+   {k:'log',label:'See the visitor log',say:['That book is private property, pal.'],when:()=>S.trust.parker<35,alt:true},
+   {k:'basement',label:'About the basement',say:['Locked. Two keys: mine and Wilson\'s. Nobody goes down there but rats.'],fx:()=>{S.flags.basement_hint=1}},
+   {k:'bennett',label:'Richard Bennett',say:['Mr. Bennett owns the place. Penthouse. He pays me, I do not ask. That is the whole philosophy.']},
+   {k:'night',label:'Press him about Tuesday night',when:()=>has('visitor_log'),
+    say:['...Fine. Fine! Nine-thirty Tuesday, the service door buzzer went. I went down to see.','Wilson was there. Said Carter was coming for some papers. I let them in and went back up.','I never saw Carter. Swear on my mother. Do not put my name in anything, pal.'],
+    need:()=>S.trust.parker>=40||has('press_pass'),fail:['I told you what I know. Is that all, pal?'],fx:()=>secret('parker_cracks')},
+   {k:'diner',label:'Casual chat',when:()=>npcLoc('parker')==='diner',say:['Rosie\'s meatloaf is the one thing in this town that never lies to you.','You know, a man hears things from the lobby. A truck on the dock side, late, Tuesday. Left around midnight.'],fx:()=>{trust('parker',12);secret('night_truck')}}
+  ]},
+ wilson:{name:'David Wilson',role:'Office manager, 3rd floor',col:'#8a8f98',ini:'D',trust:35,
+  sched:[['00:00','away'],['09:00','news'],['12:35','diner'],['13:20','news'],['18:30','away']],
+  bio:'Thin, anxious, round glasses. Has run the third floor for eleven years. Jumps when the phone rings.',
+  topics:[
+   {k:'michael',label:'Michael Carter',say:['Mike? Good kid. Chased stories like a dog chases a bus.','I have not seen him since Tuesday. Poor Emily.'],fx:()=>trust('wilson',6)},
+   {k:'drawer',label:'His locked drawer',say:['I never had a key. He carried it on him. Or hid it. Mike hid things in strange places.']},
+   {k:'meridian',label:'Meridian Holdings',when:()=>has('deed_copies')||S.seen.notice_board,say:['Fifth floor. No sign. I have never seen a person go in or out.','I sign for their mail. It all comes from the city clerk.']},
+   {k:'basement',label:'Ask for the basement key',say:['The basement? Why would you want... there is nothing down there. Just old files.'],need:()=>S.trust.wilson>=45,fail:['I cannot just hand that out. Come back when I know you better.'],
+    say2:['All right. Here. Bring it back before six, and for the love of God do not tell Parker.'],fx:()=>{give('basement_key')}},
+   {k:'notebook',label:'Confront: "D.W." in the notebook',when:()=>has('notebook'),
+    say:['...D.W. is me. All right.','Mike asked me to meet him in the basement at nine Tuesday. He said he had proof, and he needed the originals from the archive.','I got scared. I went home. I swear it. I never went down.'],fx:()=>{secret('wilson_confides');trust('wilson',-4)}},
+   {k:'diner',label:'Casual chat',when:()=>npcLoc('wilson')==='diner',say:['Between us, Mike and I played chess on Thursdays. He was winning, as usual.','He asked me about the old deed books last week. Said he needed to see how Harbor Point changed hands.'],fx:()=>trust('wilson',14)}
+  ]},
+ bennett:{name:'Richard Bennett',role:'Owner, Bennett Realty',col:'#2d2d36',ini:'R',trust:15,
+  sched:[['00:00','away'],['14:30','lobby'],['14:50','away']],
+  bio:'Sixties. Silver hair, charcoal suit, cufflinks that cost more than your car. Smiles with his mouth only.',
+  topics:[
+   {k:'michael',label:'Michael Carter',say:['A terrible shame. The Courier staff come and go. I did not know him well.']},
+   {k:'harbor',label:'Harbor Point',say:['A fine project, Mr. Miller. The city needs jobs.','Funny, I do not recall giving you my name... or you giving me yours.'],fx:()=>{secret('bennett_warns');susp(10,'Bennett knows your name')}},
+   {k:'deeds',label:'Show him the deed copies',when:()=>has('deed_copies'),say:['Where did you get those?','...Watch your step, Mr. Miller. This is an old building. Floors give way.'],fx:()=>{susp(15,'confronted Bennett');trust('bennett',-10)}}
+  ]}
+};
+Object.values(NPCS).forEach(n=>n.sched=n.sched.map(([t,r])=>[T(t),r]));
+const EV={
+ missing_report:{n:1,title:'Police missing-person report',kind:'background'},
+ visitor_log:{n:2,title:'Lobby visitor log (torn page)',kind:'timeline'},
+ notebook:{n:3,title:'Michael\'s notebook',kind:'motive'},
+ brass_key:{n:4,title:'Brass key in a hollow book',kind:'access'},
+ deed_copies:{n:5,title:'Photocopied deeds, parcels 14-19',kind:'motive'},
+ answering_machine:{n:6,title:'Threatening message on the tape',kind:'threat'},
+ suitcase:{n:7,title:'Packed suitcase and passport',kind:'timeline'},
+ press_pass:{n:8,title:'Michael\'s press pass in the basement',kind:'place'},
+ property_ledger:{n:9,title:'Basement ledger with pages torn out',kind:'motive'},
+ torn_page:{n:10,title:'Delivery slip: Warehouse 9, Pier 4',kind:'lead'}
+};
+const SECRETS={parker_cracks:'Parker let someone in through the service door',wilson_confides:'Wilson arranged the basement meeting',bennett_warns:'Bennett knows who hired you',emily_call:'The silent call to Emily',night_truck:'A truck on the dock side after midnight'};
+/* ===== STORY DATA: OBJECTS, DOCUMENTS, EVENTS ===== */
+const here=id=>npcLoc(id)===curRoom();
+const has=id=>!!S.found[id];
+const parkerAway=()=>npcLoc('parker')!=='lobby';
+const OBJS=[
+ /* agency */
+ {id:'desk',dir:'agency',file:'desk.obj',kind:'obj',label:'Desk',insp:'Your desk. A typewriter older than the lease, a cold coffee, and a bottom drawer you do not open before noon.'},
+ {id:'missing_report',dir:'agency',file:'missing_report.txt',kind:'txt',label:'Police report',ev:'missing_report',anom:1,
+  cat:()=>`HARBOR CITY POLICE DEPT. - MISSING PERSON REPORT #4471
+Subject: CARTER, Michael J., 34, white male, 5'11", brown hair.
+Occupation: reporter, Harbor Courier. Works: Bennett Building, Dock St.
+Last seen: Tue Oct 27, approx. 7:20 PM, leaving work.
+Reported by: Emily Carter (sister), Thu Oct 29.
+Investigating officer: Det. T. Harris.
+Notes: Subject is an adult. No sign of foul play. Phone off. Bank untouched.
+Status: CLOSED Fri Oct 30. Voluntary disappearance.`},
+ {id:'phone',dir:'agency',file:'phone.obj',kind:'obj',label:'Phone',insp:'Black, heavy, dial-style. Detective Harris would not return your call anyway.',use:()=>say('You dial Harris\'s desk. "Detective Harris is out." Out for you, anyway.','c-dim')},
+ /* street */
+ {id:'newspaper_box',dir:'street',file:'newspaper_box.obj',kind:'obj',label:'Newspaper box',anom:1,
+  insp:()=>{S.seen.paper=1;return'Today\'s Courier through the glass: "COUNCIL APPROVES HARBOR POINT REDEVELOPMENT". A quote from R. Bennett: "A new era for the waterfront." Below the fold, three lines: "Reporter missing, police see no crime."'}},
+ /* lobby */
+ {id:'security_desk',dir:'lobby',file:'security_desk.obj',kind:'obj',label:'Security desk',insp:()=>parkerAway()?'Empty. The guard\'s chair is still warm. A key ring hangs on a hook, and the visitor log lies open.':'Parker\'s desk. He keeps a hand on the visitor log. A key ring hangs on a hook behind him.'},
+ {id:'visitor_log',dir:'lobby',file:'visitor_log.txt',kind:'txt',label:'Visitor log',anom:1,ev:'visitor_log',
+  guard:()=>{if(!parkerAway()&&S.trust.parker<35){say('Parker slides the book away. "Visitors only, pal."','c-err');return false}return true},
+  cat:()=>`BENNETT BLDG. - LOBBY LOG
+Tue Oct 27
+ 18:55  Wilson, D.        - 3rd floor - OUT
+ 19:20  Carter, M.        - 3rd floor - OUT
+ 19:25  Parker, J.        - shift note: "all quiet"
+ [page torn out: entries 19:30 - 23:00]
+ 23:10  (illegible initials) - lobby - IN
+Wed Oct 28
+ 08:00  Parker, J.        - shift note: "locked up, nothing to report"`},
+ {id:'notice_board',dir:'lobby',file:'notice_board.obj',kind:'obj',label:'Tenant directory',anom:1,insp:()=>{S.seen.notice_board=1;return'Brass letters: 3rd floor, THE HARBOR COURIER (branch). 5th floor, MERIDIAN HOLDINGS LLC. Penthouse, BENNETT REALTY. Basement: ARCHIVE, authorized only. Nobody ever seems to visit the 5th floor.'}},
+ {id:'key_ring',dir:'lobby',file:'key_ring.item',kind:'item',label:'Key ring',take:true,when:()=>parkerAway(),
+  insp:'A ring of heavy keys. One is tagged BSMT.',onTake:()=>{give('basement_key',true);S.flags.stolen_key=1;susp(12,'took the guard\'s keys');say('You lift the basement key and leave the ring on the hook.','c-warn')}},
+ {id:'elevator',dir:'lobby',file:'elevator.obj',kind:'obj',label:'Elevator',insp:'A paper sign says OUT OF ORDER. It has said that for years. Stairs only: up to the newsroom, down to the basement.'},
+ /* newsroom */
+ {id:'michael_desk',dir:'newsroom',file:'michael_desk.obj',kind:'obj',label:"Michael's desk",anom:1,
+  insp:'A corner desk buried in paper. Cold coffee, a photo of Emily on a boat, a dented typewriter. Left drawer locked. A notebook sits under the blotter.',
+  fx:()=>reveal('notebook')},
+ {id:'notebook',dir:'newsroom',file:'notebook.item',kind:'item',label:'Notebook',take:true,hidden:1,ev:'notebook',anom:1,
+  insp:()=>`Michael's shorthand notebook, last pages:
+ "Harbor Pt. parcels 14-19 -> Meridian Hldgs. Price: 40% BELOW appraisal.
+  Who signs? Clerk Farrow + R.B. as witness. Get originals!!
+  Deeds in bsmt archive. D.W. - 9pm Tues - bsmt. He says he has the books.
+  Don't tell Em yet."`},
+ {id:'drawer',dir:'newsroom',file:'drawer.obj',kind:'obj',label:'Locked drawer',insp:()=>S.flags.drawer_open?'The drawer is open. Inside lies a thin folder of photocopies.':'A small brass lock. You will need the right key.',
+  use:()=>{if(S.flags.drawer_open){say('Already open.');return}if(!S.inv.includes('brass_key')){say('ERROR: The drawer is locked. You need a key.','c-err');return}S.flags.drawer_open=1;reveal('deed_copies');say('The brass key turns. Inside: a folder of photocopies.','c-ok')}},
+ {id:'deed_copies',dir:'newsroom',file:'deed_copies.txt',kind:'txt',label:'Deed copies',hidden:1,ev:'deed_copies',take:true,anom:1,
+  cat:()=>`PHOTOCOPIES - CITY CLERK, PROPERTY TRANSFERS
+Harbor Point parcels 14, 15, 16, 17, 18, 19.
+Sold to: MERIDIAN HOLDINGS LLC. Sale price: 40% under appraisal.
+Signed: J. Farrow, City Clerk.  Witness: R. Bennett.
+Handwritten in the margin, Michael's hand: "Originals in bsmt. Pages 114-119."`},
+ {id:'typewriter',dir:'newsroom',file:'typewriter.obj',kind:'obj',label:'Typewriter',insp:'A page in the roller: "THE HARBOR POINT SHUFFLE. By Michael Carter." Three lines, then nothing. The last line says: "Sources inside the building say..."'},
+ {id:'corkboard',dir:'newsroom',file:'corkboard.obj',kind:'obj',label:'Corkboard',insp:'Clippings, deadlines, a bus schedule. One yellowed article about the Bennett family foundation. Someone has circled the words "no bids were received".'},
+ /* apartment */
+ {id:'bookshelf',dir:'apartment',file:'bookshelf.obj',kind:'obj',label:'Bookshelf',anom:1,
+  insp:()=>{if(!S.flags.shelf_done){S.flags.shelf_done=1;reveal('brass_key');say('One of the books is too light: Moby-Dick, hollowed out. Inside: a small brass key.','c-ok')}return'Floor-to-ceiling paperbacks. Most are used crime novels. A hollowed-out copy of Moby-Dick sits at eye level.'}},
+ {id:'brass_key',dir:'apartment',file:'brass_key.item',kind:'item',label:'Brass key',take:true,hidden:1,ev:'brass_key',insp:'A small brass key, stamped with a tiny "C". It looks like it would fit a desk drawer.'},
+ {id:'answering_machine',dir:'apartment',file:'answering_machine.obj',kind:'obj',label:'Answering machine',anom:1,
+  insp:()=>S.flags.tape_gone?'The tape slot is empty. Someone took it.':'A cassette answering machine. The red light is blinking: ONE NEW MESSAGE.',
+  use:()=>{if(S.flags.tape_gone){say('ERROR: No tape.','c-err');return}found('answering_machine');say('[click] "Tuesday, 8:10 PM."\n[a man\'s voice, low, gravel] "Carter. I know what you are digging at. Drop it, or the next call will not be a message."\n[click]','c-warn')}},
+ {id:'closet',dir:'apartment',file:'closet.obj',kind:'obj',label:'Closet',anom:1,ev:'suitcase',insp:'A packed suitcase on the floor, passport in the jacket pocket, a week of clean shirts. A man who planned to leave does not leave the passport.'},
+ {id:'kitchen_table',dir:'apartment',file:'kitchen_table.obj',kind:'obj',label:'Kitchen table',insp:()=>S.flags.ransacked?'Chairs overturned, drawers dumped out. Someone searched the place since this morning.':'A mug with a dried coffee ring. A newspaper from Tuesday, folded to the real-estate page. Nothing disturbed.'},
+ /* basement */
+ {id:'shelves',dir:'basement',file:'shelves.obj',kind:'obj',label:'Archive shelves',anom:1,insp:()=>{if(!S.flags.shelf2){S.flags.shelf2=1;reveal('press_pass');reveal('property_ledger');say('Behind a fallen box, something glints: a leather press pass wallet. Scuff marks run across the floor toward the back door.','c-ok')}return'Rows of steel shelves, boxes dated back thirty years. A few boxes are overturned.'}},
+ {id:'press_pass',dir:'basement',file:'press_pass.item',kind:'item',label:'Press pass',take:true,hidden:1,ev:'press_pass',insp:'HARBOR COURIER - PRESS. M. CARTER. The clip is bent and the lanyard is snapped. He was here, and not by choice.'},
+ {id:'property_ledger',dir:'basement',file:'property_ledger.txt',kind:'txt',label:'Property ledger',hidden:1,ev:'property_ledger',anom:1,
+  cat:()=>`HARBOR POINT TRANSFER LEDGER (1950 - present)
+...
+p.113  Parcel 13   Bennett Realty   1998
+p.114-119  [TORN OUT]
+p.120  Parcel 20   city, 2003
+Stamp on the stub: MERIDIAN HOLDINGS LLC. Registered agent: R. Bennett.`},
+ {id:'service_door',dir:'basement',file:'service_door.obj',kind:'obj',label:'Service door',anom:1,
+  insp:()=>{if(!S.flags.slip_found){S.flags.slip_found=1;reveal('torn_page');say('A crumpled slip is wedged in the frame, as if torn from a clipboard.','c-ok')}return'A steel door onto the dock-side alley. The chain is cut. Fresh tire tracks in the mud outside.'}},
+ {id:'torn_page',dir:'basement',file:'torn_page.txt',kind:'txt',label:'Delivery slip',hidden:1,ev:'torn_page',take:true,anom:1,
+  cat:()=>`DELIVERY / TRANSFER SLIP
+Date: Tue Oct 27    Time: 11:00 PM
+Location: PIER 4 - WAREHOUSE 9
+Cargo: "ARCHIVE CRATES (2) + PERSONAL"
+Signed: M.H.`},
+ /* diner */
+ {id:'counter',dir:'diner',file:'counter.obj',kind:'obj',label:'Counter',insp:'A chrome counter, six stools, a pie case with three tired slices. Rosie nods at you without looking up.'},
+ {id:'booth',dir:'diner',file:'booth.obj',kind:'obj',label:'Corner booth',insp:'The corner booth, where building staff eat lunch. A salt shaker, a crumpled napkin with a half-finished crossword.'},
+ {id:'jukebox',dir:'diner',file:'jukebox.obj',kind:'obj',label:'Jukebox',insp:'Frank Sinatra, Dinah Washington, a coin slot taped shut.'}
+];
+const OB={};OBJS.forEach(o=>OB[o.id]=o);
+const DOCS={
+ 'casebook.txt':()=>`CASEBOOK / CASE #001: THE CARTER FILE
+Client:   Emily Carter
+Missing:  Michael J. Carter, 34, reporter, Harbor Courier
+Last seen: Tuesday 7:20 PM, leaving the Bennett Building, Dock Street.
+Police:   Det. Harris closed it: "voluntary disappearance".
+Rate:     $20 a day plus expenses.
+You carry: Michael's photo, the key to his apartment.
+First stop: the Bennett Building, where he worked.`,
+ 'readme.txt':()=>`This casebook runs on commands. Try:
+ ls            what is here        cd <place>   go there
+ inspect <x>   look closely        cat <file>   read a document
+ talk <name>   question someone    take <x>     pick something up
+ use <x>       use or operate      journal      your leads
+The clock keeps moving. Some doors close at night.`
+};
+const EVENTS=[
+ {t:'09:55',id:'start',fn:()=>{wlog('Case #001 opened. Miller leaves the office.')}},
+ {t:'12:30',id:'lunch',fn:()=>{wlog('Lunch hour. The lobby guard heads for the diner.')}},
+ {t:'14:30',id:'bennett',fn:()=>{wlog('A black Cadillac stops outside the Bennett Building.');say('** A black Cadillac pulls up outside the Bennett Building.','c-warn')}},
+ {t:'17:00',id:'ransack',fn:()=>{if(!S.flags.tape_heard){S.flags.tape_gone=1;wlog('Someone searched Michael\'s apartment.')}S.flags.ransacked=1;if(!has('answering_machine'))say('** A cold feeling: somebody has been busy at the Carter apartment.','c-warn')}},
+ {t:'18:45',id:'closing',fn:()=>{say('** The Bennett Building closes at 7. Parker is already looking at his watch.','c-warn')}},
+ {t:'19:00',id:'closed',fn:()=>{S.flags.night=1;wlog('The Bennett Building is locked for the night.')}}
+];
+const TEASER={t:'CHAPTER 2: HARBOR POINT',d:'Pier 4, Warehouse 9. Someone moved crates and "personal cargo" at 11 PM, the night Michael vanished.'};
+/* ===== CHAPTER PACKS: each chapter is a swappable bundle of rooms, people, objects, events and rules ===== */
+const PACKS={};let CH=null;const README=DOCS['readme.txt'];
+const swapObj=(t,s)=>{for(const k in t)delete t[k];Object.assign(t,s)};
+const swapArr=(t,s)=>{t.length=0;t.push(...s)};
+const COMMON={michael_photo:{id:'michael_photo',file:'michael_photo.item',kind:'item',label:'Photo',insp:'A creased photo: Michael and Emily on a ferry, squinting into sun. He has a crooked grin and ink on his fingers. On the back, in Emily\'s hand: "Mike, 2019".'}};
+/* helper for packs 2-4: converts "HH:MM" schedules */
+const mkNpcs=o=>{Object.values(o).forEach(n=>n.sched=n.sched.map(([t,r])=>[typeof t==='string'?T(t):t,r]));return o};
+const mkEvents=a=>a;
+function applyPack(n){const P=PACKS[n];if(!P)return;CH=P;
+ swapObj(ROOMS,P.rooms);swapObj(NPCS,P.npcs);swapObj(EV,P.ev);swapObj(SECRETS,P.secrets);swapArr(OBJS,P.objs);swapObj(DOCS,P.docs);swapArr(EVENTS,P.events);
+ swapObj(DIR2ROOM,{});Object.keys(ROOMS).forEach(k=>{if(ROOMS[k].dir)DIR2ROOM[ROOMS[k].dir]=k});
+ swapObj(OB,{});OBJS.forEach(o=>OB[o.id]=o);Object.assign(OB,COMMON,P.items||{});START=P.start;
+ try{applyMap(P)}catch(e){}}
+function beginChapter(n){if(!PACKS[n])return false;S.stats=S.stats||{};applyPack(n);
+ S.ch=n;S.done=0;S.t=CH.start;S.cwd=[];S.inv=CH.startInv(S.car||{});S.loc={};S.inv.forEach(i=>S.loc[i]='inventory');S.rev={};S.found={};S.evtxt={};S.secrets={};S.flags={};S.seen={};S.fired={};
+ S.trust={};Object.keys(NPCS).forEach(k=>S.trust[k]=NPCS[k].trust);S.susp=Math.round(S.susp*.4);
+ S.log.push({t:S.t,who:'world',txt:CH.open,kind:'world'});S.ticker=fmt(S.t)+' '+CH.open;return true}
+
+/* ---------- CHAPTER 1 (built from the data in s1.js / s2.js) ---------- */
+PACKS[1]={n:1,name:'CASE #001: THE CARTER FILE',brief:'Find out what happened to Michael Carter after he left the Bennett Building.',mapName:'HARBOR CITY, DOWNTOWN',
+ date:'Fri, Oct 30, 2026',start:T('09:55'),open:'Case #001 opened. Miller leaves the office.',
+ rooms:{...ROOMS},npcs:{...NPCS},ev:{...EV},secrets:{...SECRETS},objs:OBJS.slice(),docs:{...DOCS},events:EVENTS.slice(),
+ items:{apt_key:{id:'apt_key',file:'apt_key.item',kind:'item',label:'Apartment key',insp:'A spare key to Michael\'s apartment, tagged "4B, 112 Orchard St."'},
+  basement_key:{id:'basement_key',file:'basement_key.item',kind:'item',label:'Basement key',insp:'A heavy iron key tagged BSMT.'}},
+ startInv:()=>['michael_photo','apt_key'],
+ lock(k){if(k==='agency'||k==='diner'||k==='apt')return null;
+  if(S.flags.night)return'The building is locked for the night.';
+  if(k==='news'&&!(S.flags.pass||npcLoc('parker')!=='lobby'))return'Parker stops you at the stairs. You need a visitor badge.';
+  if(k==='base'&&!S.inv.includes('basement_key'))return'The basement door is locked. You need the basement key.';
+  return null},
+ tick(){if(S.flags.night&&!S.flags.shown&&ROOMS[heroRoom()].zone==='bennett'){S.flags.shown=1;S.cwd=['locations','street'];say('Parker\'s voice: "Closing time, pal." You are shown out onto Dock Street.','c-warn')}},
+ onFound(id){if(id==='answering_machine')S.flags.tape_heard=1;if(id==='torn_page')S.flags.lead=1},
+ leads(){const L=[];
+  if(!S.found.missing_report)L.push('Read the police report in the agency: cat locations/agency/missing_report.txt');
+  if(!S.flags.pass&&!S.found.visitor_log)L.push('Michael worked in the Bennett Building. Start at the lobby and talk to the guard.');
+  if(S.flags.pass&&!S.found.notebook)L.push('Look through Michael\'s desk on the third floor (newsroom).');
+  if(S.found.notebook&&!S.found.deed_copies&&!S.flags.shelf_done)L.push('His notebook mentions a hidden item. Search his apartment (key is in your inventory).');
+  if(S.flags.shelf_done&&!S.found.deed_copies)L.push('A brass key. Maybe it fits the locked drawer in Michael\'s desk.');
+  if(S.found.deed_copies&&!S.found.press_pass)L.push('The deeds point to archives in the basement. You need the basement key (Wilson, or Parker\'s ring).');
+  if(S.found.press_pass&&!S.found.torn_page)L.push('Michael was in the basement. Check the service door and the scuff marks.');
+  if(S.found.visitor_log&&!S.secrets.parker_cracks)L.push('The lobby log has a torn page. Press Parker about Tuesday night.');
+  if(S.found.notebook&&!S.secrets.wilson_confides)L.push('"D.W." in the notebook. Ask Wilson about it.');
+  if(!S.flags.tape_heard&&!S.flags.tape_gone)L.push('Michael\'s answering machine is still blinking. Do not wait too long.');
+  if(S.flags.tape_gone)L.push('The tape is gone. Someone else got there first.');
+  if(S.done)L.push('NEW LEAD: Pier 4, Warehouse 9. Type next to begin Chapter 2.');return L},
+ mission:()=>S.done?'Chapter 1 complete':S.t>=T('19:00')?'The building is closed. Regroup.':'Find Michael Carter.',
+ phase:()=>S.done?'Lead: Pier 4':S.t>=T('19:00')?'Night':S.t>=T('17:00')?'Evening':S.t>=T('12:00')?'Afternoon':'Morning',
+ todo:[
+  {g:'Agency',t:'Read the police report',w:'cat missing_report.txt',d:()=>has('missing_report')},
+  {g:'Carter apartment',t:'Look through Michael\'s bookshelf',w:'inspect bookshelf',d:()=>has('brass_key')},
+  {g:'Carter apartment',t:'Play the answering machine',w:'use answering_machine',d:()=>has('answering_machine')},
+  {g:'Carter apartment',t:'Check the closet',w:'inspect closet',d:()=>has('suitcase')},
+  {g:'Lobby',t:'Talk to James Parker, the guard',w:'talk parker',d:()=>S.flags.t_parker},
+  {g:'Lobby',t:'Read the visitor log',w:'cat visitor_log.txt',d:()=>has('visitor_log')},
+  {g:'Lobby',t:'Read the tenant directory (who is on the 5th floor?)',w:'inspect notice_board',d:()=>S.seen.notice_board},
+  {g:'Newsroom',t:'Search Michael\'s desk',w:'inspect michael_desk',d:()=>has('notebook')},
+  {g:'Newsroom',t:'Talk to David Wilson. Who is "D.W." in the notebook?',w:'talk wilson',d:()=>S.flags.t_wilson},
+  {g:'Newsroom',t:'Open the locked drawer with the brass key',w:'use drawer',d:()=>has('deed_copies'),s:()=>S.inv.includes('brass_key')||S.flags.drawer_open},
+  {g:'Lobby',t:'Find a way into the basement (key)',w:'take key_ring',d:()=>S.inv.includes('basement_key')},
+  {g:'Basement',t:'Search the archive shelves',w:'inspect shelves',d:()=>has('press_pass')&&has('property_ledger')},
+  {g:'Basement',t:'Examine the service door',w:'inspect service_door',d:()=>has('torn_page')},
+  {g:'Lobby',t:'Question Richard Bennett (he visits around 14:30)',w:'talk bennett',d:()=>S.flags.t_bennett}],
+ carry:()=>({deeds:!!S.found.deed_copies,tape:!!S.found.answering_machine,ledger:!!S.found.property_ledger,parkerTalk:!!S.secrets.parker_cracks,wilsonTalk:!!S.secrets.wilson_confides}),
+ finish:{title:'CASE #001 - CHAPTER 1 COMPLETE',lines:['The slip in your hand puts Michael at Pier 4 on the night he vanished.','Someone moved crates and "personal cargo" at 11 PM. And someone wanted that basement quiet.'],
+  tease:['CHAPTER 2: HARBOR POINT','Pier 4, Warehouse 9. Someone moved crates and "personal cargo" at 11 PM, the night Michael vanished.']},
+ banner:[['TERMINAL ZERO  /  CASE FILE #001','c-ok'],['THE MISSING REPORTER','c-hd'],['',''],['CLIENT   Emily Carter','c-msg'],['MISSING  Michael Carter, 34, reporter at the Harbor Courier','c-msg'],['LAST SEEN Tuesday 7:20 PM, leaving the Bennett Building, Dock Street','c-msg'],['',''],
+  ['You are John Miller, private detective. The police got nowhere.','c-dim'],['The city runs on a live clock. People come and go, and some doors close at night.','c-dim'],['You are the green figure on the map. It follows every cd you make.','c-dim'],['Open your Notebook (top of the map, or type notebook) for the to-do list. Type help for commands.','c-dim'],['','']],
+ map:{street:'Dock Street',rooms:{agency:{t:'Miller Agency',ic:'case',fl:'wood'},lobby:{t:'Bennett: Lobby',ic:'hall',fl:'marble'},news:{t:'Bennett: Newsroom',ic:'doc',fl:'lino'},apt:{t:'Carter Apartment',ic:'home',fl:'rug'},base:{t:'Bennett: Basement',ic:'folder',fl:'conc'},diner:{t:"Rosie's Diner",ic:'cup',fl:'check'}},
+  look:{hero:{hair:'#2a1f16',hat:'#3b3228'},emily:{hair:'#4a2f1c',hat:0,long:1,coat:1},parker:{hair:'#333',hat:'#1f3a66'},wilson:{hair:'#777',hat:0,glasses:1},bennett:{hair:'#c8c8c8',hat:0,coat:1}},fx:['lamps']},
+ scene:'office'};
+applyPack(1);
+/* ===== CHAPTER 2: HARBOR POINT (Friday night, Pier 4) ===== */
+(()=>{
+const lit=()=>S.inv.includes('flashlight');
+const DARK='Too dark to see anything useful. You need a flashlight.';
+const rooms={
+ street:{dir:'street',name:'PIER ROAD',zone:'street'},
+ agency:{dir:'anchor',name:'THE RUSTY ANCHOR',zone:'town'},
+ lobby:{dir:'gate',name:'PIER 4: GATE HOUSE',zone:'pier'},
+ news:{dir:'office',name:'PIER 4: DOCK OFFICE',zone:'pier'},
+ apt:{dir:'warehouse9',name:'PIER 4: WAREHOUSE 9',zone:'pier'},
+ base:{dir:'boatshed',name:'PIER 4: BOAT SHED',zone:'pier'},
+ diner:{dir:'market',name:'FISH MARKET (CLOSED)',zone:'town'},
+ away:{dir:null,name:'ELSEWHERE',zone:'away'}};
+const npcs=mkNpcs({
+ tommy:{name:'Tommy Reyes',role:'Gate guard, 19',col:'#6fa05e',ini:'T',trust:30,sched:[['00:00','away'],['18:00','lobby'],['23:00','away']],
+  bio:'Nineteen, skinny, a union cap two sizes too big. Takes the night gate for rent money and looks at his shoes when he lies.',
+  topics:[
+   {k:'chat',label:'Make small talk',say:['First season on the docks? ','Yeah. My ma says it beats the cannery. The cannery shut down years back, anyway.','Funny. Nobody in this town ever talks about the cannery.'],fx:()=>trust('tommy',14)},
+   {k:'tuesday',label:'Ask about Tuesday night',need:()=>S.trust.tommy>=40||has('roster'),fail:['I do not know anything, mister. Please.'],
+    say:['Okay. Tuesday, Mr. Hale told me to go home at half past ten. Said he would cover the gate himself.','Next morning there was a hundred dollars in my locker. No note.','I never asked. You do not ask Mr. Hale things.'],fx:()=>{secret('tommy_gate');trust('tommy',3)}},
+   {k:'key',label:'Ask about the Warehouse 9 key',need:()=>S.trust.tommy>=50,fail:['That key is on Mr. Hale\'s ring. I would get fired. Maybe fired and worse.'],
+    say:['Warehouse 9? Nobody goes in there.'],say2:['...There is a spare in the lockbox. If anybody asks, I never saw you.'],fx:()=>{give('warehouse_key')}}]},
+ hale:{name:'Marcus Hale',role:'Dock foreman',col:'#9b6038',ini:'M',trust:10,sched:[['00:00','away'],['19:00','news'],['21:00','lobby'],['21:20','news'],['22:15','apt'],['22:50','away']],
+  bio:'Big hands, a carefully trimmed mustache, and the stillness of a man who has hurt people for money. Initials: M.H.',
+  topics:[
+   {k:'work',label:'What does a foreman do?',say:['I make sure the right boxes get on the right boats.','Anything else is none of your business.']},
+   {k:'michael',label:'Ask about Michael Carter',say:['Never heard of him.','You are standing in my office, mister. Make this quick.'],fx:()=>susp(3)},
+   {k:'slip',label:'Show him the delivery slip',say:['A dock form. We stamp a thousand of them a month.','I think you are lost, Mr. Miller.'],fx:()=>{susp(5);S.flags.hale_knows=1}},
+   {k:'confront',label:'Confront: the lease and the receipt',when:()=>has('lease')&&has('hale_receipt'),
+    say:['...You are good. I will give you that.','The reporter is fine. For now. Mr. Bennett only wants the pages back.','Hand them over, and nobody gets hurt. Not you, not the sister, not him.'],fx:()=>{secret('hale_slip');secret('michael_alive');susp(12,'confronted Hale');trust('hale',-5)}}]},
+ sal:{name:'Sal Moretti',role:'Retired fisherman',col:'#5f86a8',ini:'S',trust:25,sched:[['00:00','away'],['18:00','agency']],
+  bio:'Seventy, salt-cured, perpetually at the corner stool. Sees everything that moves on the water, and half of what does not.',
+  topics:[
+   {k:'sea',label:'Talk about the sea',say:['Fifty years on that water. She never lied to me once.','People, though. People lie all day.'],fx:()=>trust('sal',12)},
+   {k:'drink',label:'Buy him a drink',say:['Lou! Another for my friend here.','You are all right, mister.'],fx:()=>trust('sal',18)},
+   {k:'truck',label:'Ask about the truck on Tuesday night',need:()=>S.trust.sal>=45,fail:['I do not talk to strangers about trucks.'],
+    say:['Tuesday, close to midnight. A canvas truck came off Pier 4 without lights, which is how I noticed.','Somebody in the back was banging on the side. Shouting, muffled.','It went north on Cove Road. Toward the old Sterling cannery, if I had to bet.'],fx:()=>{secret('sal_truck');secret('michael_alive')}}]},
+ lou:{name:'Big Lou',role:'Bartender',col:'#b0614f',ini:'L',trust:35,sched:[['00:00','away'],['18:00','agency']],
+  bio:'Wide as the bar, soft-spoken, pours generously and forgets everything on purpose. Almost everything.',
+  topics:[
+   {k:'hale',label:'Ask about Marcus Hale',say:['Hale? He drinks here Tuesdays and Fridays. Rye, no ice, tips like a priest.']},
+   {k:'chat',label:'Ask how business is',say:['Slow. Dock work is dying. I hear Harbor Point is going to bring it back. Everybody says so.'],fx:()=>trust('lou',12)},
+   {k:'tuesday',label:'Ask who Hale drank with on Tuesday',need:()=>S.trust.lou>=45,fail:['Bartenders do not name names, friend.'],
+    say:['Plainclothes guy. Gray coat. They called him Tom.','They talked low, and Hale paid in cash. That is all you get from me.'],fx:()=>secret('lou_harris')}]}
+});
+const ev={
+ gate_log:{n:1,title:'Pier 4 gate log: truck in at 23:05'},roster:{n:2,title:'Roster: Tommy sent home on Hale\'s order'},
+ lease:{n:3,title:'Warehouse 9 lease: Meridian Holdings'},hale_receipt:{n:4,title:'Receipt: cot, rope and cuffs for W9'},
+ cot_cuffs:{n:5,title:'Cot and handcuffs in Warehouse 9'},scratch_msg:{n:6,title:'Message scratched by Michael'},
+ crate_pages:{n:7,title:'Ledger pages 114-119 (originals)'},tire_tracks:{n:8,title:'Truck tracks leading north'},
+ float_note:{n:9,title:'Michael\'s note in a fishing float'},cove_map:{n:10,title:'Harbor chart: Sterling Cannery circled'}};
+const secrets={tommy_gate:'Hale sent the gate guard home Tuesday night, then paid him off',sal_truck:'A truck took a shouting man north on Cove Road',lou_harris:'A plainclothes cop named Tom met Hale on Tuesday',hale_slip:'Hale says Bennett only wants the pages',michael_alive:'Michael was alive when the truck left'};
+const objs=[
+ {id:'bar',dir:'anchor',file:'bar.obj',kind:'obj',label:'The bar',insp:'A scarred oak bar, a brass rail, and a mirror that has seen every bad idea in Harbor City. Lou polishes a glass that is already clean.'},
+ {id:'window',dir:'anchor',file:'window.obj',kind:'obj',label:'Window',insp:'The window faces Pier 4. From the corner stool you can see the gate house, the dock office, and the black shape of Warehouse 9.'},
+ {id:'gate_log',dir:'gate',file:'gate_log.txt',kind:'txt',label:'Gate log',ev:'gate_log',anom:1,
+  guard:()=>{if(npcLoc('tommy')==='lobby'&&S.trust.tommy<35&&!has('roster')){say('Tommy flips the book shut. "Sorry, mister. Gate business."','c-err');return false}return true},
+  cat:()=>`PIER 4 GATE LOG
+Tue Oct 27
+ 18:02  Reyes, T.  - on duty
+ 22:30  Reyes, T.  - OFF (per M. Hale)
+ 23:05  Truck HC-4417 - IN  - Warehouse 9 - signed M.H.
+ 23:58  Truck HC-4417 - OUT - northbound - signed M.H.`},
+ {id:'key_hook',dir:'gate',file:'key_hook.obj',kind:'obj',label:'Key board',insp:()=>{if(npcLoc('tommy')!=='lobby'&&!S.flags.office_key_seen){S.flags.office_key_seen=1;reveal('office_key');return'A board of hooks. Hook W9 is empty. Hook OFFICE still holds a brass key, and nobody is watching it.'}return'A board of hooks. Hook W9 is empty. Hook OFFICE holds a brass key, but Tommy is a foot away.'}},
+ {id:'office_key',dir:'gate',file:'office_key.item',kind:'item',label:'Office key',take:true,hidden:1,insp:'A brass key on a tag: OFFICE.'},
+ {id:'flashlight',dir:'gate',file:'flashlight.item',kind:'item',label:'Flashlight',take:true,insp:'A heavy steel flashlight, left on the shelf by the stove. It still works.'},
+ {id:'roster',dir:'office',file:'roster.txt',kind:'txt',label:'Shift roster',ev:'roster',anom:1,
+  cat:()=>`PIER 4 SHIFT ROSTER (pinned by the door)
+Tue Oct 27   Gate: REYES   18:00-23:00
+             Gate: HALE (cover)   22:30-00:30   [initialed M.H.]
+Note: "Reyes OFF early. Do not discuss."`},
+ {id:'desk',dir:'office',file:'desk.obj',kind:'obj',label:'Hale\'s desk',anom:1,
+  insp:()=>npcLoc('hale')==='news'?'Hale\'s desk, and Hale is sitting behind it. He watches your hands like a man watching a dog he has not decided about.':'A drawer of order forms and, tucked behind them, a hardware-store receipt: one folding cot, rope, two pairs of handcuffs. Paid cash, Monday Oct 26. Scrawled on the back: "for W9".',
+  post:t=>{if(npcLoc('hale')!=='news')found('hale_receipt',t)}},
+ {id:'lease',dir:'office',file:'lease.txt',kind:'txt',label:'Lease copy',ev:'lease',anom:1,
+  guard:()=>{if(npcLoc('hale')==='news'&&S.trust.hale<45){say('Hale slaps the cabinet shut. "Private files, Miller."','c-err');return false}return true},
+  cat:()=>`LEASE AGREEMENT: PIER 4, WAREHOUSE 9
+Lessor: Harbor Authority.  Lessee: MERIDIAN HOLDINGS LLC.
+Term: 5 years, paid in full.  Signed for Lessee: R. Bennett.
+Use: "archive storage". Access: M. Hale, foreman.`},
+ {id:'map',dir:'office',file:'map.obj',kind:'obj',label:'Harbor chart',anom:1,
+  insp:'A harbor chart on the wall. Cove Road runs north along the shore. One building is ringed in red grease pencil: STERLING CANNERY. Beneath it, in a neat hand: "M.C. -> here. Sat."',ev:'cove_map'},
+ {id:'cot',dir:'warehouse9',file:'cot.obj',kind:'obj',label:'Cot and cuffs',anom:1,
+  insp:()=>lit()?'A folding cot against the wall. A handcuff dangles from a water pipe, the other end of the chain scuffed bright. A sandwich wrapper, dated Tuesday. Somebody was kept here for hours.':DARK,
+  post:t=>{if(lit())found('cot_cuffs',t)}},
+ {id:'wall',dir:'warehouse9',file:'wall.obj',kind:'obj',label:'Wall behind the cot',anom:1,
+  insp:()=>lit()?'Under the cot, scratched into the plaster with a belt buckle: "MIKE C. TUES. COVE RD. FARROW KNOWS."':DARK,
+  post:t=>{if(lit())found('scratch_msg',t)}},
+ {id:'crates',dir:'warehouse9',file:'crates.obj',kind:'obj',label:'Archive crates',anom:1,
+  insp:()=>{if(!lit())return DARK;if(!S.flags.crate_open){S.flags.crate_open=1;reveal('crate_pages');say('Two crates stenciled BENNETT BLDG ARCHIVE. One lid is loose. Inside, wrapped in oilcloth, loose ledger pages.','c-ok')}return'Two crates stenciled BENNETT BLDG ARCHIVE. Whoever packed them was in a hurry.'}},
+ {id:'crate_pages',dir:'warehouse9',file:'crate_pages.txt',kind:'txt',label:'Ledger pages',hidden:1,ev:'crate_pages',take:true,anom:1,
+  cat:()=>`HARBOR POINT TRANSFER LEDGER. Pages 114-119 (torn).
+Parcels 14-19 -> MERIDIAN HOLDINGS LLC. Prices 40% under appraisal.
+Signed: J. Farrow, City Clerk.  Witness: R. Bennett.
+In Michael's handwriting, in the margin:
+"Farrow's signature does NOT match his card on file at City Hall. Forged? Or forced? Check records office."`},
+ {id:'tarp',dir:'boatshed',file:'tarp.obj',kind:'obj',label:'Canvas tarp',insp:()=>{if(!S.flags.tarp){S.flags.tarp=1;reveal('bolt_cutters');say('Under the tarp, a pair of long-handled bolt cutters, oiled and recently used.','c-ok')}return'A canvas tarp over a rowboat. Smells of tar and old fish.'}},
+ {id:'bolt_cutters',dir:'boatshed',file:'bolt_cutters.item',kind:'item',label:'Bolt cutters',take:true,hidden:1,insp:'Long-handled bolt cutters. They will take a padlock off.'},
+ {id:'float',dir:'boatshed',file:'float.obj',kind:'obj',label:'Fishing float',anom:1,
+  insp:'A hollow glass fishing float, hung with the nets. Something is rolled up inside. A note on notebook paper: "Tuesday night. Hale and the truck. They said Cove Road, the old Sterling place. If you find this, tell my sister to print it. Tell Em I am sorry I missed our nine o\'clock call. M."',
+  ev:'float_note',fx:()=>secret('michael_alive')},
+ {id:'mud',dir:'boatshed',file:'mud.obj',kind:'obj',label:'Mud behind the shed',anom:1,
+  insp:'Dual rear tires with one badly worn tread, pressed deep into the mud behind the shed. The tracks swing around the warehouse and head north toward Cove Road.',ev:'tire_tracks'},
+ {id:'payphone',dir:'market',file:'payphone.obj',kind:'obj',label:'Payphone',insp:'A battered payphone on the market wall. Someone has scratched a tally of dimes into the box.',use:()=>say('Emily picks up on the first ring. "Any news?" You tell her enough to keep her hoping. "I am not sleeping," she says. "Call me when you know."','c-dim')},
+ {id:'ice_house',dir:'market',file:'ice_house.obj',kind:'obj',label:'Ice house',insp:'A tin shed stacked with melting ice blocks. On a nail by the door hangs a faded poster: HARBOR POINT, A NEW DAWN FOR THE WATERFRONT. Meridian Holdings, developer.'}
+];
+const items={warehouse_key:{id:'warehouse_key',file:'warehouse_key.item',kind:'item',label:'Warehouse 9 key',insp:'A key tagged W9.'}};
+const docs={'casebook.txt':()=>`CASEBOOK / CASE #001, PART 2: HARBOR POINT
+The slip from the basement says Pier 4, Warehouse 9, Tuesday 11 PM, signed M.H.
+Cargo: "archive crates (2) + personal".
+It is Friday evening. The docks never really close.
+Rules of the pier: Warehouse 9 is locked, and a lot of people are paid not to notice.`,
+ 'readme.txt':README};
+const events=[
+ {t:'20:30',id:'start',fn:()=>{wlog('Friday night. Miller arrives at Pier 4.')}},
+ {t:'21:00',id:'hale_gate',fn:()=>wlog('Hale walks to the gate house.')},
+ {t:'22:15',id:'hale_w9',fn:()=>{wlog('Hale heads into Warehouse 9 with a hand truck.');say('** Heavy footsteps on the pier. Hale is going to Warehouse 9.','c-warn')}},
+ {t:'22:50',id:'cadillac',fn:()=>{wlog('A black Cadillac passes through the pier gate.');say('** A black Cadillac rolls onto the pier. Hale leaves in a hurry.','c-warn')}},
+ {t:'23:00',id:'tommy_home',fn:()=>wlog('Tommy leaves the gate house for the night.')},
+ {t:'23:45',id:'sweep',fn:()=>{wlog('Hale\'s men sweep the pier.');say('** Flashlights on the pier. Hale\'s men are sweeping the docks.','c-warn')}}];
+PACKS[2]={n:2,name:'CASE #001, PART 2: HARBOR POINT',brief:'The slip points to Pier 4, Warehouse 9. Find who M.H. is and what happened to Michael there.',mapName:'PIER 4 & THE WATERFRONT',
+ date:'Fri, Oct 30, 2026',start:T('20:30'),open:'Friday night. Miller arrives at Pier 4.',
+ rooms,npcs,ev,secrets,objs,docs,events,items,
+ startInv:()=>['michael_photo'],
+ lock(k){
+  if(k==='agency'||k==='diner'||k==='lobby'||k==='base')return null;
+  if(k==='news'){if(npcLoc('hale')==='news'||(npcLoc('hale')==='lobby')||S.inv.includes('office_key')||S.t>=T('22:50'))return null;return'The dock office is locked. Hale has the key. Maybe the key board in the gate house...'}
+  if(k==='apt'){if(npcLoc('hale')==='apt')return'Hale is inside, moving crates. Wait until he leaves.';
+   if(!S.flags.w9_open){if(S.inv.includes('warehouse_key')){S.flags.w9_open=1;S.flags.opened='key'}
+    else if(S.inv.includes('bolt_cutters')){S.flags.w9_open=1;S.flags.opened='cut';susp(10,'cut the Warehouse 9 padlock')}
+    else return'Warehouse 9 is padlocked with a Meridian Holdings lock. You need the key, or bolt cutters.'}return null}
+  return null},
+ tick(){if(S.t===T('22:15')&&heroRoom()==='apt'){S.cwd=['locations','boatshed'];say('Footsteps outside! You slip out the side door and duck into the boat shed.','c-warn')}
+  if(S.t===T('23:45')&&ROOMS[heroRoom()].zone==='pier'){S.cwd=['locations','street'];say('A flashlight beam finds you. "Pier is closed, pal." You are walked out to Pier Road.','c-warn')}},
+ onFound(id){if(id==='crate_pages')S.flags.pages=1;if(has('crate_pages')&&has('cove_map'))S.flags.lead=1},
+ leads(){const L=[];
+  if(!S.found.gate_log)L.push('Find out who was on Pier 4 on Tuesday night. Try the gate house log.');
+  if(!S.found.roster)L.push('The dock office keeps schedules. Hale is the foreman (M.H.).');
+  if(!S.flags.w9_open&&!S.flags.opened)L.push('Warehouse 9 is padlocked. Find the key (ask the gate guard), or bolt cutters (the boat shed).');
+  if(S.flags.w9_open&&!lit())L.push('The warehouse is dark. A flashlight was lying around the gate house.');
+  if(!S.found.crate_pages)L.push('"Archive crates" were stored in Warehouse 9. Search them.');
+  if(!S.found.cove_map)L.push('Hale\'s office has a harbor chart on the wall. Take a look.');
+  if(S.found.crate_pages&&!S.found.cove_map)L.push('You have the pages. Where did the truck go? Check the office chart.');
+  if(!S.secrets.sal_truck)L.push('Old Sal watches the pier from the Rusty Anchor. Buy him a drink.');
+  if(S.found.cot_cuffs&&!S.found.float_note)L.push('Michael may have left something in the boat shed.');
+  if(S.done)L.push('NEW LEAD: Michael\'s pages need proof. The clerk, Farrow. Type next for Chapter 3.');return L},
+ mission:()=>S.done?'Chapter 2 complete':S.t>=T('23:45')?'The pier is closed.':'Find where Michael was held.',
+ phase:()=>S.done?'Lead: City Hall':S.t>=T('22:50')?'Late night':S.t>=T('22:15')?'Hale is moving crates':'Friday night',
+ todo:[
+  {g:'Rusty Anchor',t:'Buy Old Sal a drink and ask about Tuesday night',w:'talk sal drink',d:()=>S.secrets.sal_truck},
+  {g:'Rusty Anchor',t:'Ask Big Lou who drinks with Hale',w:'talk lou hale',d:()=>S.secrets.lou_harris},
+  {g:'Gate house',t:'Take the flashlight',w:'take flashlight',d:()=>S.inv.includes('flashlight')},
+  {g:'Gate house',t:'Read the gate log',w:'cat gate_log.txt',d:()=>has('gate_log')},
+  {g:'Gate house',t:'Win Tommy\'s trust',w:'talk tommy chat',d:()=>S.trust.tommy>=50||S.inv.includes('warehouse_key')},
+  {g:'Dock office',t:'Read the shift roster',w:'cat roster.txt',d:()=>has('roster')},
+  {g:'Dock office',t:'Search Hale\'s desk when he is away',w:'inspect desk',d:()=>has('hale_receipt')},
+  {g:'Dock office',t:'Read the Warehouse 9 lease',w:'cat lease.txt',d:()=>has('lease')},
+  {g:'Dock office',t:'Study the harbor chart',w:'inspect map',d:()=>has('cove_map')},
+  {g:'Boat shed',t:'Look under the tarp',w:'inspect tarp',d:()=>S.flags.tarp},
+  {g:'Boat shed',t:'Check the fishing float and the mud',w:'inspect float',d:()=>has('float_note')&&has('tire_tracks')},
+  {g:'Warehouse 9',t:'Get inside (key or bolt cutters)',w:'cd warehouse9',d:()=>S.flags.w9_open},
+  {g:'Warehouse 9',t:'Search the cot and the walls',w:'inspect cot',d:()=>has('cot_cuffs')&&has('scratch_msg')},
+  {g:'Warehouse 9',t:'Open the archive crates and take the pages',w:'inspect crates',d:()=>has('crate_pages')}],
+ carry:()=>({pages:!!S.found.crate_pages,note:!!S.found.float_note,halleTalk:!!S.secrets.hale_slip,harrisTip:!!S.secrets.lou_harris,cut:S.flags.opened==='cut'}),
+ finish:{title:'CASE #001, PART 2 - CHAPTER 2 COMPLETE',lines:['Michael was held in Warehouse 9, then driven north in a truck with no lights.','The ledger pages in your coat are real, and the margin note points straight at City Hall:','"Farrow\'s signature does NOT match his card on file."'],
+  tease:['CHAPTER 3: THE CLERK','Prove the signatures are forged. Find J. Farrow, the city clerk, before Hale does.']},
+ banner:[['CHAPTER 2  /  HARBOR POINT','c-ok'],['Friday, 8:30 PM. Pier 4.','c-hd'],['',''],['The slip says Warehouse 9. The signature says M.H.','c-msg'],['Michael was here on Tuesday night. Find out who took him, and where.','c-msg'],['',''],['Hale walks the pier. The gate guard is a kid. Old Sal watches from the bar.','c-dim'],['Tip: warehouses are dark. Check the gate house for a light before you break in.','c-dim'],['','']],
+ map:{street:'Pier Road',rooms:{agency:{t:'The Rusty Anchor',ic:'cup',fl:'wood',kind:'bar'},lobby:{t:'Pier 4: Gate House',ic:'lock',fl:'conc',kind:'gate'},news:{t:'Pier 4: Dock Office',ic:'doc',fl:'lino',kind:'dockoffice'},apt:{t:'Warehouse 9',ic:'folder',fl:'steel',kind:'warehouse'},base:{t:'Pier 4: Boat Shed',ic:'hall',fl:'plank',kind:'boatshed'},diner:{t:'Fish Market',ic:'case',fl:'conc',kind:'market'}},
+  look:{hero:{hair:'#2a1f16',hat:'#3b3228'},tommy:{hair:'#4a3a2a',hat:'#2a3a5a'},hale:{hair:'#222',hat:0,coat:1},sal:{hair:'#bbb',hat:'#2a2a3a'},lou:{hair:'#222',hat:0}},fx:['fog','lamps']},
+ scene:'pier'};
+})();
+/* ===== CHAPTER 3: THE CLERK (Saturday, City Hall, the Courier, the precinct) ===== */
+(()=>{
+const rooms={
+ street:{dir:'street',name:'CIVIC CENTER PLAZA',zone:'street'},
+ agency:{dir:'hall',name:'CITY HALL: MAIN HALL',zone:'hall'},
+ lobby:{dir:'records',name:'CITY HALL: RECORDS ROOM',zone:'hall'},
+ news:{dir:'courier',name:'HARBOR COURIER: NEWSROOM',zone:'press'},
+ apt:{dir:'precinct',name:'4TH PRECINCT',zone:'police'},
+ base:{dir:'farrow',name:'FARROW\'S HOUSE',zone:'suburb'},
+ diner:{dir:'diner',name:"ROSIE'S DINER",zone:'town'},
+ away:{dir:null,name:'ELSEWHERE',zone:'away'}};
+const npcs=mkNpcs({
+ farrow:{name:'Jonathan Farrow',role:'City clerk',col:'#7a6a9a',ini:'J',trust:20,sched:[['00:00','base'],['08:30','agency'],['11:30','away'],['12:00','base']],
+  bio:'Fifty-five, bow tie, ink-stained cuffs. Twenty-six years stamping other people\'s lives. He has not eaten properly since Wednesday.',
+  topics:[
+   {k:'records',label:'Ask about the Harbor Point sale',say:['A routine transfer. Everything is on file, Mr. Miller.','I would be happy to make an appointment.'],fx:()=>trust('farrow',-2)},
+   {k:'pages',label:'Show him the ledger pages (114-119)',when:()=>S.inv.includes('pages')||S.car.pages||has('compare'),say:['Where... where did you get those?','Please. Not here. Not where they can see.'],fx:()=>{trust('farrow',12);S.flags.farrow_scared=1}},
+   {k:'reassure',label:'Reassure him: he is not alone',when:()=>S.flags.farrow_scared,say:['You are not the first man they have frightened, Mr. Farrow. You can be the one who stops them.','...Thank you. I have not heard a kind word in a week.'],fx:()=>trust('farrow',13)},
+   {k:'daughter',label:'Ask about his daughter, Annie',when:()=>S.flags.farrow_scared||S.secrets.farrow_threat,need:()=>S.trust.farrow>=40,fail:['Leave my family out of this.'],
+    say:['They sent a man to Annie\'s school on Wednesday. He said "Uncle Marcus sends his regards."','I signed. God help me, I signed what they put in front of me.'],fx:()=>{secret('farrow_threat');trust('farrow',12)}},
+   {k:'affidavit',label:'Ask him to sign an affidavit',when:()=>S.secrets.farrow_threat,need:()=>S.trust.farrow>=55&&(has('compare')||has('deposit')),fail:['If I sign, Hale will... I cannot. Not without proof I am not the only one.'],
+    say:['...'],say2:['All right. Write it down. I will sign. Take Annie\'s picture to the police if you must.','I should have said no on the first day.'],fx:()=>{found('affidavit','AFFIDAVIT OF JONATHAN FARROW: "I affixed my name to the Harbor Point transfers under threat to my family."')}}]},
+ gloria:{name:'Gloria Marsh',role:'Courier managing editor',col:'#b0485e',ini:'G',trust:40,sched:[['00:00','away'],['09:00','news'],['18:00','diner'],['19:30','news']],
+  bio:'Sixty, pencil in her hair, a voice like a ruler on a desk. Hired Michael out of college. Has not stopped the presses on a Sunday in thirty years.',
+  topics:[
+   {k:'michael',label:'Ask about Michael',say:['He turned in his first story at nineteen with eleven typos. I told him he would go far.','He was filing on Harbor Point. Then he stopped filing.']},
+   {k:'draft',label:'Ask for Michael\'s draft',when:()=>S.flags.t_gloria,say:['It is in the morgue, second drawer, behind the Yankees clippings. Nobody touches it.','Do not copy it. Read it there.'],fx:()=>{S.flags.draft_hint=1;reveal('draft')}},
+   {k:'deadline',label:'Ask what it takes to print',when:()=>has('draft'),say:['A signed statement, a document, and a named source.','Get me all three by ten tonight, and Sunday\'s front page is yours. Michael\'s byline, my name on the masthead.'],fx:()=>secret('gloria_deadline')},
+   {k:'recorder',label:'Ask to borrow a recorder',when:()=>S.secrets.gloria_deadline,say:['It is a reel-to-reel, but it fits in a coat. Do not drop it in the harbor.'],fx:()=>{give('recorder')},once:'rec'}]},
+ harris:{name:'Tom Harris',role:'Detective, 4th Precinct',col:'#6e6e76',ini:'T',trust:20,sched:[['00:00','away'],['09:00','apt'],['13:00','diner'],['14:00','apt'],['19:00','away']],
+  bio:'Gray coat, gray eyes, gray everything. Eleven years in homicide, three of them on the take. He knows exactly how this looks.',
+  topics:[
+   {k:'closed',label:'Ask why he closed the Carter case',say:['Adult male, packed bag, no body. That is not a crime, Miller.'],fx:()=>trust('harris',-2)},
+   {k:'tom',label:'Confront: "Tom" at the Rusty Anchor with Hale',when:()=>S.car.harrisTip,say:['...Who told you that?','It was one drink. One.'],fx:()=>trust('harris',8)},
+   {k:'memo',label:'Confront: the closure memo',when:()=>has('memo'),need:()=>S.trust.harris>=25,fail:['A memo is a memo. Get out of my office.'],
+    say:['Fine. Fine. Yes, Bennett leaned on me. I signed because my pension is all I have.','I kept my hands out of the rest, Miller. I swear it.'],fx:()=>{secret('harris_paid');trust('harris',10)}},
+   {k:'pension',label:'Appeal to what is left of his conscience',when:()=>S.secrets.harris_paid,say:['Eleven years. You think I do not hear it every night?','Maybe it is not too late for one honest thing.'],fx:()=>trust('harris',10)},
+   {k:'help',label:'Ask him to help you tonight',when:()=>S.secrets.harris_paid,need:()=>S.trust.harris>=45&&(has('affidavit')||has('deposit')),fail:['Bring me something real. A statement, a bank slip. Then maybe.'],
+    say:['...'],say2:['If you call me from the cannery, I come. Lights off, no sirens, no uniforms who like Bennett.','I will not forgive myself either way.'],fx:()=>{secret('harris_ally')}}]},
+ emily:{name:'Emily Carter',role:'Client, Michael\'s sister',col:'#c8564e',ini:'E',trust:70,sched:[['00:00','away'],['09:00','diner']],
+  bio:'She has been awake since Tuesday and drinking coffee like it is her job. Her hands will not stay still.',
+  topics:[
+   {k:'michael',label:'Update her on the case',say:['Tell me the truth, Mr. Miller. Is he alive?','I keep saying it is not a story. Then I think: it is exactly the kind of story he would chase.']},
+   {k:'call',label:'Ask about the phone call',when:()=>S.flags.call,say:['A man. Low voice. He said ten o\'clock, Cove Road, bring the pages.','I wrote it down. I am coming with you.'],fx:()=>{reveal('ransom_note');S.flags.emily_coming=1}}]},
+ doyle:{name:'Pat Doyle',role:'Desk sergeant',col:'#4f6a8a',ini:'P',trust:30,sched:[['00:00','away'],['07:00','apt']],
+  bio:'Wide, patient, nineteen years behind the same desk. Chews cinnamon toothpicks and never forgets a face.',
+  topics:[
+   {k:'chat',label:'Ask how the shift is going',say:['Saturday. Drunks, parking, and the usual noise.'],fx:()=>trust('doyle',14)},
+   {k:'cadillac',label:'Ask about a black Cadillac at the precinct',need:()=>S.trust.doyle>=45,fail:['I keep my eyes on my desk, friend.'],
+    say:['Thursday morning, seven sharp. Silver-haired man in a charcoal suit went straight up to Harris\'s office.','Harris came down looking like he had seen a ghost.'],fx:()=>secret('doyle_saw')}]}
+});
+const ev={
+ signature_card:{n:1,title:'Farrow\'s real signature card'},compare:{n:2,title:'Pages vs. card: signatures forged'},
+ cannery_deed:{n:3,title:'Deed index: Sterling Cannery owned by Meridian'},deposit:{n:4,title:'Farrow\'s $20,000 cash deposit slip'},
+ farrow_letter:{n:5,title:'Farrow\'s unsent confession'},affidavit:{n:6,title:'Farrow\'s signed affidavit'},
+ clippings:{n:7,title:'Courier clippings: no bids received'},memo:{n:8,title:'Closure memo "per R.B."'},
+ ransom_call:{n:9,title:'Ransom call: Cove Road at 10 PM'},draft:{n:10,title:'Michael\'s full draft: The Harbor Point Shuffle'}};
+const secrets={farrow_threat:'Hale threatened Farrow\'s daughter',gloria_deadline:'Gloria will print by 10 PM tonight',harris_paid:'Harris closed the case under pressure from Bennett',doyle_saw:'Bennett visited Harris at the precinct on Thursday',harris_ally:'Harris will come to the cannery if called'};
+const objs=[
+ {id:'directory',dir:'hall',file:'directory.obj',kind:'obj',label:'Building directory',insp:'Brass plates: CITY CLERK, ground floor east. RECORDS, ground floor west. The clerk\'s window is marked: J. FARROW.'},
+ {id:'clerk_window',dir:'hall',file:'clerk_window.obj',kind:'obj',label:'Clerk window',insp:()=>npcLoc('farrow')==='agency'?'Farrow sits behind the glass, stamping forms without looking at them. He sees you and his stamp pauses.':'The clerk\'s window is dark. A card says: BACK AT 9:00.'},
+ {id:'farrow_desk',dir:'hall',file:'farrow_desk.obj',kind:'obj',label:'Farrow\'s desk drawer',anom:1,
+  insp:()=>npcLoc('farrow')==='agency'?'The drawer is under Farrow\'s knee. He pretends not to notice you looking.':'A bank deposit slip dated Wednesday: $20,000 cash, depositor J. FARROW, memo line "Meridian consulting".',
+  post:t=>{if(npcLoc('farrow')!=='agency')found('deposit',t)}},
+ {id:'signature_card',dir:'records',file:'signature_card.txt',kind:'txt',label:'Signature cards',ev:'signature_card',anom:1,
+  cat:()=>`CITY OF HARBOR CITY - SIGNATURE CARD
+Clerk: FARROW, Jonathan R.   On file since 1998.
+Specimen: a tight, upright "J. Farrow" with a flat-topped F and a looping, closed r.`},
+ {id:'compare',dir:'records',file:'compare.obj',kind:'obj',label:'Comparison table',anom:1,
+  insp:()=>S.inv.includes('pages')||S.car.pages?'You lay Michael\'s ledger pages beside the signature card under the lamp. The F on the pages is open at the top. The r is a hook, not a loop. Whoever signed these was copying Farrow, and doing it badly.':'You put the card under the lamp beside the clerk\'s index copy of the transfers. The signature on file transfers 14 through 19 does not match the card: open F, hooked r. Forged, or written under duress.',
+  post:t=>found('compare',t)},
+ {id:'deed_index',dir:'records',file:'deed_index.txt',kind:'txt',label:'Deed index',ev:'cannery_deed',anom:1,
+  cat:()=>`CITY DEED INDEX (excerpt)
+Parcel 31, STERLING CANNERY, Cove Road.
+2019: sold by the City at auction, "no bids received" (private sale).
+Owner: MERIDIAN HOLDINGS LLC.  Agent: R. Bennett.
+Status: vacant. Utilities active.`},
+ {id:'microfilm',dir:'records',file:'microfilm.obj',kind:'obj',label:'Microfilm reader',insp:'A clacking microfilm reader. The last reel it was loaded with is the 2019 council minutes. Someone bookmarked a page about the Sterling Cannery.'},
+ {id:'morgue',dir:'courier',file:'morgue.obj',kind:'obj',label:'Newspaper morgue',insp:()=>{if(S.flags.draft_hint||S.flags.t_gloria){reveal('draft');return'The morgue: wall-to-wall file drawers. Second drawer, behind the Yankees clippings, a folder labeled "SHUFFLE".'}return'The morgue: wall-to-wall file drawers. Gloria watches you from her glass office.'}},
+ {id:'draft',dir:'courier',file:'draft.txt',kind:'txt',label:'Michael\'s draft',hidden:1,ev:'draft',take:true,anom:1,
+  cat:()=>`THE HARBOR POINT SHUFFLE, by Michael Carter (DRAFT)
+Six city parcels. One shell company. A clerk who signed, a developer who witnessed, a foreman who "handled" objections.
+The sale price was forty percent under appraisal. The buyer was MERIDIAN HOLDINGS LLC, whose only officer is Richard Bennett.
+Sources inside the Bennett Building say the originals of pages 114-119 were removed from the basement archive.
+[draft ends mid-sentence] "If I am right, the next page will be the end of the Harbor Point"`},
+ {id:'clipping_file',dir:'courier',file:'clipping_file.txt',kind:'txt',label:'Sterling clippings',ev:'clippings',anom:1,
+  cat:()=>`COURIER, MARCH 2019: "CITY SELLS CANNERY, NO BIDS RECEIVED"
+Council voted 5-2 in a closed session to sell the Sterling Cannery to a private buyer. The buyer was not named.
+A councilman who voted no told the Courier: "I have never seen an auction with no bidders."
+A pencil note on the clipping, in Michael's hand: "Meridian. Same shell as Harbor Point."`},
+ {id:'ransom_note',dir:'diner',file:'ransom_note.txt',kind:'txt',label:'Emily\'s note',hidden:1,ev:'ransom_call',anom:1,
+  cat:()=>`EMILY'S HANDWRITTEN NOTE (from the phone call at 5:40 PM)
+Man's voice, low. "Pages for your brother. Cove Road, the old cannery. Ten o'clock tonight. Alone. No police, no newspaper, or he dies."
+She wrote under it: "Mr. Miller, I am coming. He is my brother."`},
+ {id:'counter',dir:'diner',file:'counter.obj',kind:'obj',label:'Counter',insp:'Rosie slides you a coffee without asking. "On the house, hon. You look like you need it."'},
+ {id:'case_board',dir:'precinct',file:'case_board.obj',kind:'obj',label:'Case board',insp:'A corkboard of wanted flyers, missing kids, and one blank patch where a Michael Carter flyer was pinned and removed.'},
+ {id:'memo_file',dir:'precinct',file:'memo_file.txt',kind:'txt',label:'Closed-case memo',ev:'memo',anom:1,
+  guard:()=>{const s=npcLoc('doyle')==='apt';if(s&&S.trust.doyle<35){say('Doyle taps the desk. "Case files are for officers, friend."','c-err');return false}return true},
+  cat:()=>`4TH PRECINCT - INTERNAL MEMO
+Re: CARTER, Michael J. (missing person #4471)
+Disposition: CLOSED. "Voluntary disappearance."
+Per R.B. Do not reopen without my approval.
+(initialed T.H.)`},
+ {id:'farrow_letter',dir:'farrow',file:'farrow_letter.txt',kind:'txt',label:'Unsent letter',hidden:1,ev:'farrow_letter',anom:1,
+  cat:()=>`TO WHOM IT MAY CONCERN:
+I, Jonathan Farrow, state that the Harbor Point transfers were signed in a basement office at gunpoint, with my daughter's picture on the table.
+I did not write the name on the pages Michael Carter showed me. Another hand forged it. I confess that I did not stop them.
+[unsigned, folded, taped inside a hollow chess king]`},
+ {id:'chess_set',dir:'farrow',file:'chess_set.obj',kind:'obj',label:'Chess set',anom:1,insp:()=>{if(!S.flags.chess){S.flags.chess=1;reveal('farrow_letter');say('The white king is hollow. Taped inside, a folded letter.','c-ok')}return'A well-worn chess set on a side table, game paused mid-endgame. The white king looks heavier than it should.'}},
+ {id:'annie_photo',dir:'farrow',file:'annie_photo.obj',kind:'obj',label:'Photo of Annie',insp:'A school photo of a girl with a gap-toothed smile and a bow tie to match her father\'s.'}
+];
+const items={recorder:{id:'recorder',file:'recorder.item',kind:'item',label:'Pocket recorder',insp:'A pocket reel-to-reel recorder, Courier property. A little red light shows when it is running. Use it near someone who is about to say something stupid.',use:()=>{S.flags.rec_on=!S.flags.rec_on;say(S.flags.rec_on?'The recorder\'s red light glows. It is rolling.':'You switch the recorder off.','c-ok')}},
+ pages:{id:'pages',file:'pages.item',kind:'item',label:'Ledger pages',insp:'Pages 114-119, folded in your inside pocket.'}};
+const docs={'casebook.txt':()=>`CASEBOOK / CASE #001, PART 3: THE CLERK
+Michael's note on the pages: "Farrow's signature does NOT match his card on file."
+City Hall opens at nine. The Courier is Michael's paper. The precinct is where the case was buried.
+Bring proof. Hale's men are walking the streets too.`,'readme.txt':README};
+const events=[
+ {t:'08:30',id:'start',fn:()=>{wlog('Saturday morning. Miller arrives at City Hall.')}},
+ {t:'11:30',id:'farrow_leaves',fn:()=>wlog('Farrow leaves City Hall abruptly.')},
+ {t:'17:40',id:'ransom',fn:()=>{S.flags.call=1;reveal('ransom_note');wlog('Emily gets a phone call at the diner.');say('** A phone rings in Rosie\'s Diner. Emily goes pale.','c-warn')}},
+ {t:'22:00',id:'deadline',fn:()=>{say('** The Courier presses are warming up. Gloria\'s deadline has arrived.','c-warn')}}];
+PACKS[3]={n:3,name:'CASE #001, PART 3: THE CLERK',brief:'Michael\'s pages might be forged. Prove it, get Farrow to talk, and find out who covered the case up.',mapName:'CIVIC CENTER, DOWNTOWN',
+ date:'Sat, Oct 31, 2026',start:T('08:30'),open:'Saturday morning. Miller arrives at City Hall.',
+ rooms,npcs,ev,secrets,objs,docs,events,items,
+ startInv:(c)=>c.pages?['michael_photo','pages']:['michael_photo'],
+ lock(k){
+  if(k==='diner'||k==='agency')return null;
+  if(k==='lobby'){if(npcLoc('farrow')==='agency'||S.t>=T('09:00'))return null;return'The records room opens at 9:00.'}
+  if(k==='news')return null;
+  if(k==='apt')return null;
+  if(k==='base'){if(S.flags.farrow_scared||S.t>=T('12:00'))return null;return'You do not know where Farrow lives. Show him the pages first, or ask around.'}
+  return null},
+ tick(){if(has('affidavit')&&has('cannery_deed')&&S.flags.call)S.flags.lead=1},
+ onFound(id){if(has('affidavit')&&has('cannery_deed')&&S.flags.call)S.flags.lead=1},
+ leads(){const L=[];
+  if(!S.found.compare)L.push('Compare the forged signature with Farrow\'s card in the records room.');
+  if(S.found.compare&&!S.flags.farrow_scared)L.push('Show Farrow the pages. He is scared, not guilty.');
+  if(!S.found.cannery_deed)L.push('Michael\'s chart ringed a cannery. Check the deed index for who owns it.');
+  if(!S.found.draft)L.push('Gloria Marsh at the Courier may have Michael\'s unpublished draft in the morgue.');
+  if(!S.found.memo)L.push('The precinct closed the case in a hurry. Look for the file.');
+  if(S.secrets.farrow_threat&&!S.found.affidavit)L.push('Farrow needs proof he is not alone before he will sign. A deposit slip, or the signature compare.');
+  if(S.flags.call)L.push('Emily got a ransom call. Ten PM, Cove Road, the cannery. Read her note at the diner.');
+  if(S.found.affidavit&&!S.found.cannery_deed)L.push('You have the affidavit. Prove who owns the cannery.');
+  if(S.done)L.push('NEW LEAD: Sterling Cannery, 10 PM. Type next for Chapter 4.');return L},
+ mission:()=>S.done?'Chapter 3 complete':'Prove the forgery. Find Michael.',
+ phase:()=>S.done?'Lead: Cove Road':S.flags.call?'The ransom call':S.t>=T('12:00')?'Afternoon':'Morning',
+ todo:[
+  {g:'City Hall',t:'Look at the clerk window and the building directory',w:'inspect clerk_window',d:()=>S.seen.clerk_window},
+  {g:'Records room',t:'Read the signature cards',w:'cat signature_card.txt',d:()=>has('signature_card')},
+  {g:'Records room',t:'Compare the signature with the pages',w:'inspect compare',d:()=>has('compare')},
+  {g:'Records room',t:'Who owns the Sterling Cannery? (deed index)',w:'cat deed_index.txt',d:()=>has('cannery_deed')},
+  {g:'City Hall',t:'Search Farrow\'s desk drawer when he is away',w:'inspect farrow_desk',d:()=>has('deposit')},
+  {g:'City Hall',t:'Talk to Jonathan Farrow',w:'talk farrow',d:()=>S.flags.t_farrow},
+  {g:'Courier',t:'Talk to Gloria Marsh',w:'talk gloria',d:()=>S.flags.t_gloria},
+  {g:'Courier',t:'Find Michael\'s draft in the morgue',w:'inspect morgue',d:()=>has('draft')},
+  {g:'Courier',t:'Read the Sterling Cannery clippings',w:'cat clipping_file.txt',d:()=>has('clippings')},
+  {g:'Precinct',t:'Read the closed-case memo',w:'cat memo_file.txt',d:()=>has('memo')},
+  {g:'Precinct',t:'Question Detective Harris',w:'talk harris',d:()=>S.flags.t_harris},
+  {g:'Farrow\'s house',t:'Find Farrow after he disappears at noon',w:'cd farrow',d:()=>S.flags.t_farrow&&S.cwd.includes('farrow')||has('farrow_letter')},
+  {g:'Farrow\'s house',t:'Get his signed affidavit',w:'talk farrow affidavit',d:()=>has('affidavit')},
+  {g:'Diner',t:'Check on Emily (she waits at Rosie\'s)',w:'cd diner',d:()=>S.flags.t_emily||S.seen.counter}],
+ carry:()=>({affidavit:!!S.found.affidavit,recorder:S.inv.includes('recorder'),harrisAlly:!!S.secrets.harris_ally,harrisPaid:!!S.secrets.harris_paid,pages:!!S.car.pages||S.inv.includes('pages'),draft:!!S.found.draft,deposit:!!S.found.deposit}),
+ finish:{title:'CASE #001, PART 3 - CHAPTER 3 COMPLETE',lines:['Farrow\'s signature was forged, and Farrow\'s own affidavit says so.','The Sterling Cannery belongs to Meridian Holdings. And at 10 PM tonight, Emily has been told to bring the pages there.'],
+  tease:['CHAPTER 4: THE LAST EDITION','Cove Road, ten o\'clock. Everything you have found has to be enough.']},
+ banner:[['CHAPTER 3  /  THE CLERK','c-ok'],['Saturday, 8:30 AM. City Hall.','c-hd'],['',''],['Michael\'s margin note: "Farrow\'s signature does NOT match his card on file."','c-msg'],['Prove it. Then find out who else is covering for Bennett.','c-msg'],['',''],['City Hall, the Courier and the 4th Precinct are all within a cab ride. Emily waits at Rosie\'s.','c-dim'],['Your notebook has the day\'s to-do list. Type notebook.','c-dim'],['','']],
+ map:{street:'Civic Plaza',rooms:{agency:{t:'City Hall: Main Hall',ic:'hall',fl:'marble',kind:'cityhall'},lobby:{t:'City Hall: Records',ic:'folder',fl:'lino',kind:'records'},news:{t:'Harbor Courier',ic:'doc',fl:'lino',kind:'newsroom2'},apt:{t:'4th Precinct',ic:'lock',fl:'tile',kind:'precinct'},base:{t:'Farrow\'s House',ic:'home',fl:'rug',kind:'house'},diner:{t:"Rosie's Diner",ic:'cup',fl:'check',kind:'diner'}},
+  look:{hero:{hair:'#2a1f16',hat:'#3b3228'},emily:{hair:'#4a2f1c',hat:0,long:1,coat:1},farrow:{hair:'#555',hat:0,glasses:1},gloria:{hair:'#b0b0b0',hat:0,long:1,coat:1},harris:{hair:'#666',hat:'#44444a',coat:1},doyle:{hair:'#333',hat:'#1f3a66'}},fx:['day']},
+ scene:'hall'};
+})();
+/* ===== CHAPTER 4: THE LAST EDITION (Saturday night, Sterling Cannery) ===== */
+const ENDINGS={
+ A:{t:'THE LAST EDITION',head:'BENNETT ARRESTED IN HARBOR POINT FRAUD',sub:'By Michael Carter',tone:'good',
+  lines:['Richard Bennett confessed on tape. Detective Harris walked him out in handcuffs, rain on his charcoal suit.','Farrow\'s affidavit, the originals and Michael\'s draft ran together on Sunday\'s front page. The byline is Michael Carter\'s.','Emily kept the first copy off the press. She keeps it framed over the office desk Miller still cannot afford.']},
+ B:{t:'HALF THE STORY',head:'HARBOR POINT DEAL UNDER QUESTION',sub:'Courier staff report',tone:'mid',
+  lines:['Michael is alive, and that is worth every dollar of the fee. Hale will serve time. Bennett has three lawyers and a very good memory for what he did not say.','The Courier printed what it could prove. It was a good story, just not the whole one.','Miller has a new file marked OPEN. He is not done with Richard Bennett.']},
+ C:{t:'TOO LATE',head:'MICHAEL CARTER: STILL MISSING',sub:'Day 6',tone:'bad',
+  lines:['At midnight the black Cadillac left Cove Road with the lights off. By dawn the cannery was empty, and so was the cold room.','Emily still waits by the phone. Miller does not tell her to stop.','Some cases are not closed. They are just left open for the next man who is not afraid of the dark.']},
+ D:{t:'THE ENVELOPE',head:'HARBOR POINT: A FRESH START FOR THE WATERFRONT',sub:'Paid advertisement',tone:'dark',
+  lines:['Michael walked out of the cannery alive, with a promise that he would never write another word about Harbor Point.','The envelope on Miller\'s desk is fatter than anything he has ever earned. It does not feel like money.','Emily has not spoken to him since. The ad ran in Sunday\'s paper.']}};
+function resolveEnding(why){if(S.done)return;
+ const freed=!!S.flags.freed,conf=!!S.secrets.bennett_confesses&&has('recording'),ally=!!S.car.harrisAlly;
+ let id;if(S.flags.deal)id='D';else if(S.flags.caught)id='C';else if(freed&&conf&&ally)id='A';else if(freed)id='B';else id='C';
+ finishGame(id)}
+function finishGame(id){const E=ENDINGS[id];S.done=1;S.flags.end=id;S.stats[4]={ev:ev10(),sec:sec5(),trust:avgTrust(),susp:S.susp};const m=meta();m.end=id;m.ch4=1;setMeta(m);
+ const tev=Object.values(S.stats).reduce((a,x)=>a+(x?x.ev:0),0),tsec=Object.values(S.stats).reduce((a,x)=>a+(x?x.sec:0),0);
+ say('');say('================================','c-box');say(' CASE CLOSED - ENDING '+id+': '+E.t,'c-box');say('================================','c-box');E.lines.forEach(l=>say(l));say('');
+ say('Evidence over all chapters: '+tev+'/40');say('Leads over all chapters: '+tsec+'/20');say('Final suspicion: '+S.susp+'%');say('');say('THE END. Open the menu to start a new game.','c-ok');
+ OUT.push(['\u0000ending',id])}
+(()=>{
+const brave=()=>[S.car.affidavit,S.car.pages||S.inv.includes('pages'),has('contract'),has('safe_ledger'),has('truck_plate'),S.car.draft].filter(Boolean).length;
+const rooms={
+ street:{dir:'street',name:'COVE ROAD',zone:'street'},
+ agency:{dir:'yard',name:'CANNERY: YARD',zone:'cannery'},
+ lobby:{dir:'office',name:'CANNERY: OFFICE',zone:'cannery'},
+ news:{dir:'floor',name:'CANNERY: CANNING FLOOR',zone:'cannery'},
+ apt:{dir:'coldroom',name:'CANNERY: COLD ROOM',zone:'cannery'},
+ base:{dir:'loft',name:'CANNERY: LOFT',zone:'cannery'},
+ diner:{dir:'car',name:'YOUR CAR ON COVE ROAD',zone:'road'},
+ away:{dir:null,name:'ELSEWHERE',zone:'away'}};
+const npcs=mkNpcs({
+ emily:{name:'Emily Carter',role:'Client, Michael\'s sister',col:'#c8564e',ini:'E',trust:80,sched:[['00:00','diner']],
+  bio:'She sits very straight in the passenger seat, hands wrapped around a cold thermos, watching the cannery lights through the rain.',
+  topics:[
+   {k:'plan',label:'Tell her the plan',say:['You said stay in the car, so I am staying in the car. But if you are not out by midnight, I am walking in.','Bring him back, Mr. Miller.']},
+   {k:'brother',label:'Ask what Michael is like',say:['He is the one who hides the last cookie so you will think he ate it.','He writes about people who have no one. He would never expect anyone to write about him.']},
+   {k:'reunion',label:'Tell her he is safe',when:()=>S.flags.freed,say:['Mike?! ...Oh, God. Mike.','He is thinner. His glasses are broken. He is laughing and crying at the same time.'],fx:()=>{S.flags.reunion=1}}]},
+ vince:{name:'Vince Kowalski',role:'Cannery night guard',col:'#6a7a58',ini:'V',trust:30,sched:[['00:00','agency'],['21:30','news'],['22:30','agency']],
+  bio:'Hired muscle with a tired face. Takes the extra pay, hates the extra work. Keeps a flask in his slicker.',
+  topics:[
+   {k:'chat',label:'Make small talk',say:['Rain. Always rain. You know what I did before this? Delivered milk.','Milk men do not get paid for the sleep they lose.'],fx:()=>trust('vince',18)},
+   {k:'paid',label:'Ask who pays him',need:()=>S.trust.vince>=45,fail:['I do not know what you mean, pal. Keep walking.'],say:['...Mr. Hale. Cash, every Friday, double what the cannery paid.','There is a guy in the cold room. He does not shout anymore. I wish he would. It is worse.'],fx:()=>{secret('vince_paid');trust('vince',15)}},
+   {k:'key',label:'Ask about the cold room key',when:()=>S.secrets.vince_paid,need:()=>S.trust.vince>=60,fail:['I cannot. Hale would hang me.'],say:['No.'],say2:['...There is a spare on the hook in the office safe. Combination is the signing date. Mr. Hale is not subtle.'],fx:()=>{S.flags.safe_hint=1}}]},
+ hale:{name:'Marcus Hale',role:'Dock foreman',col:'#9b6038',ini:'M',trust:5,sched:[['00:00','lobby'],['21:45','news'],['22:00','lobby'],['23:30','away']],
+  bio:'The same trimmed mustache, the same stillness. Tonight his coat is wet and his hands are not.',
+  topics:[
+   {k:'michael',label:'Ask where Michael is',say:['Somewhere warm. Warmer than you are going to be.'],fx:()=>susp(8)},
+   {k:'monday',label:'Press him about the signing on Monday',when:()=>has('contract'),say:['Monday. The signing is Monday. After that the reporter\'s story is just words.','Until then he stays on ice. Do not make me hurt you, Mr. Miller.'],fx:()=>{secret('hale_deadline');susp(10)}}]},
+ bennett:{name:'Richard Bennett',role:'Owner, Bennett Realty',col:'#2d2d36',ini:'R',trust:10,sched:[['00:00','away'],['22:00','lobby'],['23:30','away']],
+  bio:'Silver hair, charcoal suit, a smile that stops at the cheekbones. He is not worried. That is the most worrying thing about him.',
+  topics:[
+   {k:'welcome',label:'Greet him',say:['Mr. Miller. I wondered how long you would take. Sit, sit. You have caused me a great deal of paperwork.']},
+   {k:'deal',label:'Hear his offer',say:['Fifty thousand dollars. Today. Michael walks out of here alive, you forget my name, and your client stops asking questions.','It is the most generous offer you will ever hear. Do take a moment.'],fx:()=>{S.flags.offer=1;found('cheque','A signed cheque for $50,000, payee: cash, drawn on a Meridian Holdings account.')}},
+   {k:'confront',label:'Confront him with everything you have',need:()=>brave()>=3,fail:['Circumstantial, Mr. Miller. A forged signature, a clerk with a guilty conscience... A judge will laugh. Bring me something that cannot be explained.'],
+    say:['...'],say2:['Forty percent under appraisal, six parcels, and one reporter who could not leave a story alone.','Yes, Mr. Miller. All of it was my idea. Hale simply carried it out. I wanted Harbor Point finished before a city hall clerk\'s guilty conscience could stop it.','You think a recording changes anything? I have owned this city longer than you have been alive.'],fx:()=>{secret('bennett_confesses');if(S.flags.rec_on&&S.inv.includes('recorder')){found('recording','Tape: Bennett confesses to the Harbor Point scheme in his own voice.');say('[The recorder\'s red light is still on. The tape has all of it.]','c-ok')}}},
+   {k:'accept',label:'Take the money',when:()=>S.flags.offer,say:['A sensible man. The envelope is on the desk.','Hale! Release the reporter. We are done here.'],fx:()=>{S.flags.deal=1;resolveEnding('deal')}},
+   {k:'refuse',label:'Refuse the money',when:()=>S.flags.offer,say:['A pity. You seem to have mistaken me for someone who negotiates twice.'],fx:()=>{S.flags.refused=1;susp(10)}}]},
+ michael:{name:'Michael Carter',role:'Reporter, the Courier',col:'#c0894e',ini:'M',trust:70,sched:[['00:00','apt']],at:()=>S.flags.freed?'diner':null,
+  bio:'Thirty-four, crooked grin, ink on his fingers. Five days in a cold room have taken fifteen pounds and none of his stubbornness.',
+  topics:[
+   {k:'free',label:'Get him out of here',say:['Miller? Emily sent you? ...Of course she did.','Can I walk? I will find out.'],fx:()=>{S.flags.freed=1;found('michael_free','Michael Carter, alive, freed from the cold room.');say('You help Michael up and out through the service door. He is on his feet.','c-ok')}},
+   {k:'story',label:'Ask what he saw',say:['They kept me for Bennett\'s signing on Monday. Hale talks a lot when he thinks you are asleep.','Bennett was here Thursday. He promised me my own byline if I buried it.'],fx:()=>secret('michael_testimony')},
+   {k:'notebook',label:'Ask about his second notebook',say:['They took the first. This one I kept in my sock. Here.'],fx:()=>{give('notebook2');found('notebook2','Michael\'s second notebook: "R.B. orders it. M.H. does it. T.H. looks away. Sign Mon."')}}]},
+ harris:{name:'Tom Harris',role:'Detective, 4th Precinct',col:'#6e6e76',ini:'T',trust:50,sched:[['00:00','away']],at:()=>(S.flags.called&&S.car.harrisAlly&&S.t>=S.flags.calledAt+8)?'agency':null,
+  bio:'Gray coat, wet to the knees. No sirens. He looks like a man doing one right thing to make up for a hundred wrong ones.',
+  topics:[{k:'arrest',label:'Tell him where Bennett is',say:['I heard. Lights off, two cars. Stay out of my way, Miller.']}]}
+});
+const ev={
+ truck_plate:{n:1,title:'Truck HC-4417 parked in the cannery yard'},guard_log:{n:2,title:'Guard\'s log: "package" delivered Tue 23:58'},
+ contract:{n:3,title:'Meridian contract: $14M signing on Monday'},safe_ledger:{n:4,title:'Original ledger: Bennett\'s own handwriting'},
+ cold_key:{n:5,title:'Cold room key from the office safe'},belongings:{n:6,title:'Michael\'s belongings in the cold room'},
+ notebook2:{n:7,title:'Michael\'s second notebook'},recording:{n:8,title:'Recording: Bennett confesses'},
+ cheque:{n:9,title:'Bennett\'s $50,000 hush cheque'},michael_free:{n:10,title:'Michael Carter, alive and free'}};
+const secrets={vince_paid:'Hale pays the cannery guard in cash',hale_deadline:'Michael is being held until Monday\'s signing',bennett_confesses:'Bennett confessed to the whole scheme',michael_testimony:'Michael heard Bennett order the kidnapping',harris_called:'The police were called to Cove Road'};
+const objs=[
+ {id:'truck',dir:'yard',file:'truck.obj',kind:'obj',label:'Canvas truck',anom:1,insp:'A canvas-backed truck, plate HC-4417. The rear dual tires are caked with harbor mud, one tread badly worn. Exactly the tracks from the boat shed.',ev:'truck_plate'},
+ {id:'tool_bench',dir:'yard',file:'tool_bench.obj',kind:'obj',label:'Tool bench',insp:()=>{if(!S.flags.bench){S.flags.bench=1;reveal('crowbar');say('Among the rusted tools: a long steel crowbar.','c-ok')}return'A bench of rusted tools under a tin roof, dripping with rain.'}},
+ {id:'crowbar',dir:'yard',file:'crowbar.item',kind:'item',label:'Crowbar',take:true,hidden:1,insp:'A three-foot steel crowbar. It would open a lot of doors, and make a lot of noise doing it.'},
+ {id:'overalls',dir:'yard',file:'overalls.item',kind:'item',label:'Cannery overalls',take:true,insp:'Wet canvas overalls and a slicker hanging on a nail. In the dark and the rain, the guards might mistake you for one of their own.',use:()=>{S.flags.disguise=1;say('You pull the slicker over your coat and the cap down over your eyes. In the dark, at a distance, you are just another night man.','c-ok')}},
+ {id:'rain_barrel',dir:'yard',file:'rain_barrel.obj',kind:'obj',label:'Rain barrel',insp:'Brimming. Somebody has been meaning to put a lid on it for years.'},
+ {id:'desk',dir:'office',file:'desk.obj',kind:'obj',label:'Office desk',insp:'A steel desk, a green lamp, ashtray, a bottle of rye. Everything has the look of a room used for conversations that do not get written down.'},
+ {id:'contract',dir:'office',file:'contract.txt',kind:'txt',label:'Meridian contract',ev:'contract',anom:1,
+  guard:()=>{if(npcLoc('hale')==='lobby'&&S.t<T('22:00')){say('Hale\'s eyes follow the paper. You decide not to touch it yet.','c-err');return false}return true},
+  cat:()=>`MERIDIAN HOLDINGS LLC - PURCHASE AND SALE AGREEMENT
+Seller: MERIDIAN HOLDINGS LLC (parcels 14-19, Harbor Point).
+Buyer: the State Port Authority.  Price: $14,000,000.
+Signing: Monday, Nov 2, 10 AM.  Signatory: R. Bennett.
+Note in the margin: "Until then, M.C. stays quiet."`},
+ {id:'calendar',dir:'office',file:'calendar.obj',kind:'obj',label:'Wall calendar',insp:'A cannery calendar from a defunct fish supplier. November 2 is ringed twice in red. Beside it, in block capitals: SIGNING.'},
+ {id:'safe',dir:'office',file:'safe.obj',kind:'obj',label:'Wall safe',anom:1,insp:()=>S.flags.safe_open?'The safe stands open: a ledger and a ring with a single key.':'A gray combination safe in the wall. Four digits. Try: use safe <four digits>.',
+  use:(a)=>{if(S.flags.safe_open){say('Already open.');return}const c=(a&&a[0])||'';if(!c){say('Usage: use safe <four digits>','c-dim');return}if(c==='1102'){S.flags.safe_open=1;reveal('safe_ledger');reveal('cold_key');say('Click. The safe swings open. Inside, a ledger and a single key tagged COLD.','c-ok')}else{susp(5);say('The dial clicks wrong. Nothing happens. Not the right numbers.','c-err')}}},
+ {id:'safe_ledger',dir:'office',file:'safe_ledger.txt',kind:'txt',label:'Original ledger',hidden:1,ev:'safe_ledger',take:true,anom:1,
+  cat:()=>`BENNETT PERSONAL LEDGER
+Parcels 14-19: price negotiated "down" with J. Farrow (signature supplied M.H.).
+Payments: M. Hale $9,000; J. Farrow $20,000 "consulting"; T. Harris $5,000 "case management".
+Every line initialed in the same slanted hand: R.B.`},
+ {id:'cold_key',dir:'office',file:'cold_key.item',kind:'item',label:'Cold room key',hidden:1,take:true,ev:'cold_key',insp:'A heavy iron key on a tag: COLD.'},
+ {id:'phone',dir:'office',file:'phone.obj',kind:'obj',label:'Desk phone',anom:1,insp:'A black desk phone with a line out of the building. You could call someone. Anyone. Once.',
+  use:()=>{if(S.flags.called){say('You already called. Hold on.','c-dim');return}S.flags.called=1;S.flags.calledAt=S.t;secret('harris_called');
+   if(S.car.harrisAlly){say('Harris picks up on the first ring. "Twelve minutes. Lights off." He hangs up.','c-ok')}else say('A dispatcher says units are on the way. You do not recognize the voice. You hope nobody warns Bennett first.','c-warn');S.flags.endAt=S.t+14}},
+ {id:'guard_log',dir:'floor',file:'guard_log.txt',kind:'txt',label:'Guard\'s log',ev:'guard_log',anom:1,
+  cat:()=>`CANNERY NIGHT LOG (Vince K.)
+Tue 23:58  Truck in from Pier 4. "Package" to cold room per M. Hale.
+Wed-Fri    Meals to cold room, 1 daily.
+Sat        Boss expected 22:00. No visitors till then.
+(A different hand under the last line): "Bennett wants the pages by tonight, or it is done."`},
+ {id:'conveyor',dir:'floor',file:'conveyor.obj',kind:'obj',label:'Conveyor line',insp:'A rusted canning line. Fish tins still ride the belt, sealed in 2019 and never collected.'},
+ {id:'cold_door',dir:'floor',file:'cold_door.obj',kind:'obj',label:'Cold room door',anom:1,insp:()=>S.flags.cold_open?'The heavy door hangs open.':'A heavy steel door with a frosted porthole. Frost. A dim shape inside. Behind the glass, someone is breathing.',
+  use:()=>{if(S.flags.cold_open){say('Already open.');return}if(S.inv.includes('cold_key')){S.flags.cold_open=1;say('The key turns. The door swings open.','c-ok')}else if(S.inv.includes('crowbar')){S.flags.cold_open=1;susp(18,'forced the cold room door');say('You jam the crowbar in and heave. The door groans open. That was loud.','c-warn')}else say('It is locked. You need the cold room key, or something to break the door.','c-err')}},
+ {id:'belongings',dir:'coldroom',file:'belongings.txt',kind:'txt',label:'Michael\'s things',ev:'belongings',anom:1,cat:()=>`A cracked pair of glasses, a wallet with Emily's photo, a Courier notepad with its cover torn off, and a shirt button.
+Scratched into the metal wall: "HE WILL NOT STOP ME WRITING."`},
+ {id:'cot2',dir:'coldroom',file:'cot2.obj',kind:'obj',label:'Prison cot',insp:'A cot, a bucket, a dented tin plate. He has been here five days.'},
+ {id:'binoculars',dir:'loft',file:'binoculars.obj',kind:'obj',label:'Binoculars',insp:'You scan the yard from the loft window: Vince on patrol, a black Cadillac parked past the gate, the office windows lit.'},
+ {id:'loft_window',dir:'loft',file:'loft_window.obj',kind:'obj',label:'Loft window',insp:'From here you see the whole cannery: the yard, the canning floor and the office. Good place to watch from. Bad place to be trapped in.'},
+ {id:'thermos',dir:'car',file:'thermos.obj',kind:'obj',label:'Thermos',insp:'Emily\'s coffee. Cold, but she cannot stop holding it.'}
+];
+const items={recorder:{id:'recorder',file:'recorder.item',kind:'item',label:'Pocket recorder',insp:'A pocket reel-to-reel recorder, Courier property. A little red light shows when it is running.',use:()=>{S.flags.rec_on=!S.flags.rec_on;say(S.flags.rec_on?'The recorder\'s red light glows. It is rolling.':'You switch the recorder off.','c-ok')}},
+ pages:{id:'pages',file:'pages.item',kind:'item',label:'Ledger pages',insp:'Pages 114-119, folded in your inside pocket.'},notebook2:{id:'notebook2',file:'notebook2.item',kind:'item',label:'Michael\'s notebook',insp:'"R.B. orders it. M.H. does it. T.H. looks away. Sign Mon."'}};
+const docs={'casebook.txt':()=>`CASEBOOK / CASE #001, PART 4: THE LAST EDITION
+Ten o'clock, Cove Road, the old Sterling Cannery. Emily waits in the car.
+Michael is somewhere inside. Hale walks the floor. Bennett arrives at ten.
+Four ways this can end. Pick carefully, and keep the recorder rolling.`,'readme.txt':README};
+const events=[
+ {t:'20:30',id:'start',fn:()=>{wlog('Saturday night. Miller arrives at the Sterling Cannery.')}},
+ {t:'21:30',id:'vince_patrol',fn:()=>wlog('Vince walks the canning floor.')},
+ {t:'22:00',id:'bennett',fn:()=>{wlog('Bennett\'s Cadillac pulls into the yard.');say('** Headlights across the fence. The black Cadillac slides into the yard. Bennett goes into the office.','c-warn')}},
+ {t:'23:00',id:'moving',fn:()=>{say('** An engine idles in the yard. They are getting ready to move Michael.','c-warn')}},
+ {t:'23:30',id:'deadline',fn:()=>{say('** The Cadillac leaves the yard with its lights off.','c-err')}}];
+PACKS[4]={n:4,name:'CASE #001, PART 4: THE LAST EDITION',brief:'Ten o\'clock on Cove Road. Free Michael and make Bennett answer for it.',mapName:'STERLING CANNERY, COVE ROAD',
+ date:'Sat, Oct 31, 2026',start:T('20:30'),open:'Saturday night. Miller arrives at the Sterling Cannery.',
+ rooms,npcs,ev,secrets,objs,docs,events,items,
+ startInv:(c)=>{const a=['michael_photo'];if(c.recorder)a.push('recorder');if(c.pages)a.push('pages');return a},
+ lock(k){
+  if(k==='apt'){if(!S.flags.cold_open)return'The cold room door is shut and locked. Find a way to open it (use cold_door on the canning floor).';return null}
+  return null},
+ tick(){
+  if(S.done)return;const hr=heroRoom(),hostile=id=>npcLoc(id)===hr&&hr!=='diner'&&hr!=='street';
+  if(hostile('vince')&&!S.flags.disguise){susp(2);if(!S.flags.vsaw||S.t-S.flags.vsaw>8){S.flags.vsaw=S.t;say('** Vince\'s flashlight sweeps across you. He has not decided to shout yet.','c-warn')}}
+  if(hostile('hale')&&S.t<T('22:00')&&hr!=='lobby'||hostile('hale')&&S.t<T('22:00')){susp(3);if(!S.flags.hsaw||S.t-S.flags.hsaw>8){S.flags.hsaw=S.t;say('** Hale\'s head turns. He is looking in your direction.','c-warn')}}
+  if(S.susp>=100&&!S.flags.caught){S.flags.caught=1;say('** A hand grabs your collar. Hale\'s men have you. The lights go out.','c-err');resolveEnding('caught');return}
+  if(S.flags.endAt&&S.t>=S.flags.endAt){S.flags.endAt=0;resolveEnding('police');return}
+  if(S.t>=T('23:30')&&!S.done)resolveEnding('late')},
+ onFound(id){},
+ leads(){const L=[];
+  if(!S.flags.freed){
+   if(!S.found.truck_plate)L.push('The truck from Pier 4 might be in the yard.');
+   if(!S.flags.cold_open)L.push('Michael is in the cold room off the canning floor. You need the cold room key, or a crowbar.');
+   if(!S.flags.safe_open)L.push('There is a safe in the office. A date on the wall calendar may be the combination (hint: "signing").');
+   if(!S.flags.disguise)L.push('Vince patrols the yard and the floor. Find some cover, or make friends.');
+   if(S.t<T('22:00'))L.push('Bennett arrives at ten. Be ready with everything you have.');}
+  else L.push('Michael is free and in the car with Emily. Finish this: use phone in the office, or confront Bennett.');
+  if(S.flags.freed&&!S.secrets.bennett_confesses)L.push('Bennett is in the office until 23:30. Turn on your recorder (use recorder), then talk bennett confront.');
+  if(!S.flags.called)L.push('The office phone gets you police backup. Use it last.');
+  return L},
+ mission:()=>S.done?'Case closed':S.flags.freed?'Finish it.':'Find Michael. Stay unseen.',
+ phase:()=>S.done?'Ending '+S.flags.end:S.t>=T('23:00')?'Almost midnight':S.t>=T('22:00')?'Bennett is here':'Cannery at night',
+ todo:[
+  {g:'Yard',t:'Check the truck',w:'inspect truck',d:()=>has('truck_plate')},
+  {g:'Yard',t:'Grab the overalls (for cover) or the crowbar',w:'take overalls',d:()=>S.inv.includes('overalls')||S.inv.includes('crowbar')},
+  {g:'Yard',t:'Win Vince over (small talk, then ask who pays him)',w:'talk vince chat',d:()=>S.secrets.vince_paid},
+  {g:'Office',t:'Read the wall calendar',w:'inspect calendar',d:()=>S.seen.calendar},
+  {g:'Office',t:'Open the safe (four digits)',w:'use safe',d:()=>S.flags.safe_open},
+  {g:'Office',t:'Read the Meridian contract (when Hale is away)',w:'cat contract.txt',d:()=>has('contract')},
+  {g:'Canning floor',t:'Read the guard log',w:'cat guard_log.txt',d:()=>has('guard_log')},
+  {g:'Canning floor',t:'Open the cold room door',w:'use cold_door',d:()=>S.flags.cold_open},
+  {g:'Cold room',t:'Talk to Michael and get him out',w:'talk michael free',d:()=>S.flags.freed},
+  {g:'Cold room',t:'Take his second notebook',w:'talk michael notebook',d:()=>has('notebook2')},
+  {g:'Office',t:'Turn the recorder on and confront Bennett (after 22:00)',w:'use recorder',d:()=>has('recording')},
+  {g:'Office',t:'Call the police from the office phone (last step)',w:'use phone',d:()=>S.flags.called},
+  {g:'Car',t:'Tell Emily he is safe',w:'talk emily reunion',d:()=>S.flags.reunion}],
+ carry:()=>({}),
+ finish:{title:'',lines:[],tease:['','']},
+ banner:[['CHAPTER 4  /  THE LAST EDITION','c-ok'],['Saturday, 8:30 PM. Sterling Cannery, Cove Road.','c-hd'],['',''],['Ten o\'clock. Bennett is coming. Michael is inside.','c-msg'],['Emily waits in the car. Hale and Vince walk the grounds.','c-msg'],['',''],['Stay unseen: the Suspicion bar is your fuse. At 100%, they grab you.','c-dim'],['Four endings. Evidence from earlier chapters matters tonight.','c-dim'],['','']],
+ map:{street:'Cove Road',rooms:{agency:{t:'Cannery: Yard',ic:'lock',fl:'dirt',kind:'yard'},lobby:{t:'Cannery: Office',ic:'doc',fl:'lino',kind:'canoffice'},news:{t:'Canning Floor',ic:'case',fl:'steel',kind:'cannery'},apt:{t:'Cold Room',ic:'folder',fl:'ice',kind:'coldroom'},base:{t:'Cannery Loft',ic:'hall',fl:'plank',kind:'loft'},diner:{t:'Your Car',ic:'home',fl:'dirt',kind:'car'}},
+  look:{hero:{hair:'#2a1f16',hat:'#3b3228'},emily:{hair:'#4a2f1c',hat:0,long:1,coat:1},vince:{hair:'#222',hat:'#2a3a2a',coat:1},hale:{hair:'#222',hat:0,coat:1},bennett:{hair:'#c8c8c8',hat:0,coat:1},michael:{hair:'#4a3a2a',hat:0,glasses:1},harris:{hair:'#666',hat:'#44444a',coat:1}},fx:['rain','lamps']},
+ scene:'cannery'};
+})();
+/* ===== ENGINE CORE: STATE, TIME, FILE SYSTEM ===== */
+const LS_SAVE='tz_save_v2',LS_META='tz_meta_v2';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+let S=null,OUT=[],COST=0;
+const say=(t,c)=>OUT.push([t==null?'':String(t),c||'']);
+const spend=n=>{COST+=n};
+const ALLCMDS=['help','ls','cd','pwd','cat','inspect','observe','talk','take','use','status','map','journal','log','evidence','wait','time','clear','mkdir','touch','write','rm','save','reset','next'];
+function newState(){const tr={};Object.keys(NPCS).forEach(k=>tr[k]=NPCS[k].trust);const inv=CH.startInv({}),loc={};inv.forEach(i=>loc[i]='inventory');
+ return{v:2,ch:CH.n,t:CH.start,cwd:[],mode:'play',cmds:ALLCMDS.slice(),inv,loc,rev:{},found:{},evtxt:{},secrets:{},flags:{},seen:{},susp:0,trust:tr,stats:{},car:{},
+  log:[{t:CH.start,who:'world',txt:CH.open,kind:'world'}],ticker:fmt(CH.start)+' '+CH.open,userfs:{},userdirs:[],fired:{},count:0,done:0,savedAt:null}}
+function meta(){try{return JSON.parse(localStorage.getItem(LS_META))||{}}catch(e){return{}}}
+function setMeta(m){try{localStorage.setItem(LS_META,JSON.stringify(m))}catch(e){}}
+function persist(){try{S.savedAt=Date.now();localStorage.setItem(LS_SAVE,JSON.stringify(S))}catch(e){}}
+function loadSave(){try{const s=JSON.parse(localStorage.getItem(LS_SAVE));if(s&&s.v===2){s.ch=s.ch||1;s.stats=s.stats||{};s.car=s.car||{};return s}return null}catch(e){return null}}
+function wlog(txt,o){o=o||{};S.log.push({t:S.t,who:o.who||'world',txt,kind:o.kind||'world'});if((o.who||'world')==='world')S.ticker=fmt(S.t)+' '+txt}
+function plog(kind,txt){S.log.push({t:S.t,who:'player',txt,kind})}
+function susp(n,why){S.susp=clamp(S.susp+n,0,100);if(why&&n>0)wlog('Suspicion raised: '+why,{kind:'susp'})}
+function trust(id,n){S.trust[id]=clamp(S.trust[id]+n,0,100)}
+function trustLabel(v){return v>=75?'Trusting':v>=55?'Cooperative':v>=35?'Guarded':v>=15?'Wary':'Hostile'}
+function npcLoc(id,t){t=t==null?S.t:t;const N0=NPCS[id];if(N0&&N0.at){const q=N0.at();if(q)return q}let r='away';for(const [tt,rr] of NPCS[id].sched){if(tt<=t)r=rr}return r}
+const peopleIn=room=>Object.keys(NPCS).filter(id=>npcLoc(id)===room);
+function curRoom(){return S.cwd[0]==='locations'&&S.cwd[1]?DIR2ROOM[S.cwd[1]]||null:null}
+const heroRoom=()=>curRoom()||'street';
+const ev10=()=>Object.keys(S.found).length;
+const sec5=()=>Object.keys(S.secrets).length;
+const avgTrust=()=>Math.round(Object.values(S.trust).reduce((a,b)=>a+b,0)/Object.keys(S.trust).length);
+function secret(id){if(S.secrets[id])return;S.secrets[id]=S.t;say('[LEAD NOTED: '+SECRETS[id]+']','c-ok');plog('secret',SECRETS[id])}
+function reveal(id){S.rev[id]=1}
+function give(id,silent){if(!S.inv.includes(id))S.inv.push(id);S.loc[id]='inventory';reveal(id);if(!silent)say('You now carry: '+OB[id].file,'c-ok')}
+function found(id,text){if(S.found[id])return;S.found[id]=S.t;S.evtxt[id]=text||EV[id].title;say('[EVIDENCE #'+EV[id].n+' RECORDED: '+EV[id].title+']','c-ok');plog('evidence',EV[id].title);wlog('Evidence recorded: '+EV[id].title);
+ if(CH.onFound)CH.onFound(id)}
+/* objects */
+const locOf=id=>S.loc[id]||OB[id].dir;
+function visible(id){const o=OB[id],l=locOf(id);if(l==='gone')return false;if(o.hidden&&!S.rev[id])return false;if(o.when&&!o.when())return false;return true}
+const objsIn=dir=>Object.keys(OB).filter(id=>locOf(id)===dir&&visible(id));
+function objs(room){const d=ROOMS[room]&&ROOMS[room].dir;if(!d)return[];return objsIn(d).map(id=>[id,OB[id].kind,!!OB[id].anom&&!S.seen[id]])}
+/* access rules */
+function roomLock(k){if(k==='street'||k==='away')return null;return CH.lock?CH.lock(k):null}
+/* time */
+function advance(m){m=Math.max(0,Math.round(m));
+ for(let i=0;i<m;i++){if(S.t>=1439){if(!S.flags.midnight){S.flags.midnight=1;say('It is nearly midnight. The clock stops here.','c-dim')}break}
+  const before={};Object.keys(NPCS).forEach(id=>before[id]=npcLoc(id));S.t++;
+  for(const e of EVENTS){if(T(e.t)===S.t&&!S.fired[e.id]){S.fired[e.id]=1;e.fn()}}
+  Object.keys(NPCS).forEach(id=>{const a=before[id],b=npcLoc(id);if(a!==b){const r=heroRoom(),N=NPCS[id].name;if(a===r&&a!=='street')say(N+' leaves the room.','c-dim');if(b===r&&b!=='street')say(N+' comes in.','c-dim')}});
+  if(CH.tick)CH.tick()}}
+/* paths */
+const FIXED=['','locations','evidence','notes','inventory'];
+function resolve(arg){arg=(arg||'').trim();if(!arg)return S.cwd.slice();const base=/^(~|\/)/.test(arg)?[]:S.cwd.slice();
+ arg.replace(/^~/,'').split('/').forEach(p=>{if(!p||p==='.')return;if(p==='..')base.pop();else base.push(p)});return base}
+function isDir(p){const k=p.join('/');if(FIXED.includes(k))return true;if(p[0]==='locations'&&p.length===2)return!!DIR2ROOM[p[1]];return S.userdirs.includes(k)}
+function resolveDir(arg){const parts=(arg||'').split('/').filter(x=>x&&x!=='.'&&x!=='~');const c=[resolve(arg),parts,['locations',...parts]];for(const p of c){if(p.includes('..'))continue;if(isDir(p))return p}return null}
+const pstr=p=>'~'+(p.length?'/'+p.join('/'):'');
+const objDirOf=p=>p.join('/')==='inventory'?'inventory':p[0]==='locations'&&p.length===2?p[1]:null;
+function listDir(p){const k=p.join('/');let a=[];
+ if(k===''){a=[['casebook.txt','file'],['readme.txt','file'],['locations','dir'],['evidence','dir'],['notes','dir'],['inventory','dir']]}
+ else if(k==='locations')a=Object.keys(ROOMS).filter(r=>ROOMS[r].dir).map(r=>[ROOMS[r].dir,'dir']);
+ else if(k==='evidence')a=Object.keys(S.found).sort((x,y)=>EV[x].n-EV[y].n).map(id=>['ev'+String(EV[id].n).padStart(2,'0')+'_'+id+'.txt','file']);
+ else{const d=objDirOf(p);if(d){objsIn(d).forEach(id=>a.push([OB[id].file,'file']));if(d!=='inventory'){const r=DIR2ROOM[d];peopleIn(r).forEach(n=>a.push([n+'.npc','npc']))}}}
+ Object.keys(S.userfs).forEach(f=>{const i=f.lastIndexOf('/'),dd=f.slice(0,i);if(dd===k)a.push([f.slice(i+1),'file'])});
+ S.userdirs.forEach(d=>{const i=d.lastIndexOf('/'),pp=i<0?'':d.slice(0,i);if(pp===k)a.push([d.slice(i+1),'dir'])});
+ return a}
+const stem=f=>f.replace(/\.[^.]+$/,'').toLowerCase();
+/* find a readable thing by name: returns {t:'obj'|'doc'|'ev'|'user', ...} */
+function findThing(arg){if(!arg)return null;const i=arg.lastIndexOf('/');let dirs;
+ const nm=(i<0?arg:arg.slice(i+1)).toLowerCase();
+ if(i<0)dirs=[S.cwd.slice()].concat(curRoom()?[]:[['locations','street']],[['inventory'],['evidence'],[]]);else{const dp=arg.slice(0,i)||'/';const d=resolveDir(dp);dirs=d?[d]:[]}
+ for(const p of dirs){const k=p.join('/');
+  if(k===''&&DOCS[nm])return{t:'doc',name:nm};
+  if(k==='evidence'){const id=Object.keys(S.found).find(x=>nm===('ev'+String(EV[x].n).padStart(2,'0')+'_'+x+'.txt')||nm===x||nm==='ev'+String(EV[x].n).padStart(2,'0'));if(id)return{t:'ev',id}}
+  if(S.userfs[(k?k+'/':'')+nm])return{t:'user',key:(k?k+'/':'')+nm};
+  const d=objDirOf(p);if(d){const id=objsIn(d).find(x=>OB[x].file.toLowerCase()===nm||x===nm||stem(OB[x].file)===nm);if(id)return{t:'obj',id,dir:d}}}
+ return null}
+function findNpc(a){if(!a)return null;a=a.toLowerCase().replace(/\.npc$/,'');return Object.keys(NPCS).find(k=>k===a||NPCS[k].name.toLowerCase().split(' ').includes(a)||NPCS[k].name.toLowerCase()===a)||null}
+function tok(line){const a=[];line.replace(/"([^"]*)"|'([^']*)'|(\S+)/g,(m,x,y,z)=>{a.push(x!==undefined?x:y!==undefined?y:z)});return a}
+/* ===== COMMANDS ===== */
+const C={};
+const NOTAVAIL='ERROR: Target is not available.';
+const nm=id=>NPCS[id].name;
+const npcSay=(id,l)=>say(id.toUpperCase()+': "'+l+'"','c-hd');
+C.help=()=>{say('Available commands:','c-hd');[['help','Show commands'],['ls','List what is here (ls -a for everything)'],['cd','Go somewhere (cd locations/lobby)'],['pwd','Show where you are'],['cat','Read a document'],['inspect','Look closely at an object or person'],['observe','Look around, or watch a place from outside'],['talk','Question someone (talk <name> [topic])'],['take','Pick something up'],['use','Use or operate something'],['status','Show case status'],['map','Who is where'],['journal','Your leads'],['log','Event log'],['evidence','List evidence (evidence <n> to read)'],['wait','Let time pass (wait <minutes>)'],['time','Show the time'],['clear','Clear the screen'],['mkdir / touch / write / rm','Keep your own notes'],['save / reset','Save progress, or start over'],['next','Begin the next chapter (when one is ready)'],['notebook','Open your to-do notebook'],['menu','Open the main menu']].forEach(([a,b])=>say('  '+a.padEnd(11)+' - '+b));say('');say('Tip: Tab completes, Up/Down recalls. Click a room or a person on the map.','c-dim')};
+C.pwd=()=>say(pstr(S.cwd));
+C.time=()=>say('It is '+fmt(S.t)+(S.t>=T('19:00')||S.t<T('06:00')?'. Night.':'.'));
+C.clear=()=>OUT.push(['\u0000clear','']);
+C.ls=a=>{const all=a.includes('-a'),arg=a.find(x=>!x.startsWith('-'));const p=arg?resolveDir(arg):S.cwd.slice();if(!p){say('ERROR: No such directory.','c-err');return}
+ const r=p[0]==='locations'&&p.length===2?DIR2ROOM[p[1]]:null;if(r&&r!==heroRoom()){const l=roomLock(r);if(l){say('ERROR: '+l,'c-err');return}}
+ const items=listDir(p);say('total '+items.length,'c-dim');items.forEach(([n,k])=>say((k==='dir'?'drwx  ':k==='npc'?'-npc  ':'-rw-  ')+n+(k==='dir'?'/':''),k==='dir'?'c-sys':k==='npc'?'c-msg':''));if(!items.length)say('(empty)','c-dim');
+ if(r&&p.join('/')===S.cwd.join('/')){const n=objs(r).filter(o=>o[2]).length;if(n)say(n+' thing(s) here deserve a closer look.','c-dim')}};
+C.cd=a=>{const arg=a[0]||'~';const p=arg==='~'||arg==='/'?[]:resolveDir(arg);if(!p){say('ERROR: No such place: '+arg,'c-err');return}
+ const nr=p[0]==='locations'&&p.length===2?DIR2ROOM[p[1]]:null,or=heroRoom();
+ if(nr){const l=roomLock(nr);if(l){say('ERROR: '+l,'c-err');susp(0);return}
+  const cost=nr===or?0:ROOMS[nr].zone===ROOMS[or].zone?3:8;S.cwd=p;spend(cost);if(cost)say('You walk over. ('+cost+' min)','c-dim');
+  const pp=peopleIn(nr);say('Entered '+ROOMS[nr].name+'.'+(pp.length?' Present: '+pp.map(nm).join(', ')+'.':' Nobody is here.'),'c-dim');plog('visit','Went to '+ROOMS[nr].name+'.');return}
+ if(['','locations'].includes(p.join('/'))){if(curRoom()&&curRoom()!=='street'){spend(4);say('You step back out onto the street.','c-dim')}S.cwd=p;return}
+ S.cwd=p};
+C.cat=a=>{const t=findThing(a[0]);if(!t){say('ERROR: No such file.','c-err');return}spend(1);
+ if(t.t==='doc'){say(DOCS[t.name]());return}if(t.t==='ev'){say(S.evtxt[t.id]);return}if(t.t==='user'){say(S.userfs[t.key]||'(empty)','c-dim');return}
+ const o=OB[t.id];if(t.dir!=='inventory'&&t.dir!==ROOMS[heroRoom()].dir){say('ERROR: You are not there. Go to locations/'+t.dir+' first.','c-err');return}
+ if(o.kind!=='txt'){say('ERROR: Not a document. Try inspect '+o.id+'.','c-err');return}if(o.guard&&!o.guard())return;
+ const txt=o.cat();say(txt);S.seen[o.id]=1;if(o.ev)found(o.ev,txt);plog('read','Read '+o.file+'.')};
+C.inspect=a=>{if(!a[0]){say('ERROR: Usage: inspect <object|person>','c-err');return}const n=findNpc(a[0]);
+ if(n){const h=heroRoom();if(npcLoc(n)!==h&&n!=='emily'){say(NOTAVAIL+' '+nm(n)+' is not here.','c-err');return}spend(1);const N=NPCS[n];say(N.name+' - '+N.role,'c-hd');say(N.bio);say('Location now: '+(npcLoc(n)==='away'?'not seen':ROOMS[npcLoc(n)].name));say('Attitude toward you: '+trustLabel(S.trust[n]));return}
+ const t=findThing(a[0]);if(!t||t.t!=='obj'){if(t){C.cat(a);return}say(NOTAVAIL,'c-err');return}
+ if(t.dir!=='inventory'&&t.dir!==ROOMS[heroRoom()].dir){say('ERROR: You are not there. Go to locations/'+t.dir+' first.','c-err');return}
+ const o=OB[t.id];spend(1);if(o.fx)o.fx();const txt=typeof o.insp==='function'?o.insp():o.insp;say(txt);S.seen[o.id]=1;if(o.post)o.post(txt);if(o.ev)found(o.ev,txt);plog('inspect','Inspected '+o.label+'.')};
+C.observe=a=>{let r=a[0]?Object.keys(ROOMS).find(k=>ROOMS[k].dir&&(ROOMS[k].dir===a[0].toLowerCase()||k===a[0].toLowerCase())):heroRoom();
+ if(!r){say('ERROR: Unknown place. Try one of: '+Object.values(ROOMS).filter(x=>x.dir).map(x=>x.dir).join(', '),'c-err');return}
+ spend(2);const pp=peopleIn(r);const hr=heroRoom();
+ say('LOCATION: '+ROOMS[r].name,'c-hd');say('Time: '+fmt(S.t));
+ if(r!==hr&&r!=='street'){say('You watch from across the street. '+(roomLock(r)&&S.flags.night?'The windows are dark.':'Lights are on.')+' '+(pp.length?pp.length+' figure(s) move inside.':'No movement.'),'c-dim');return}
+ say(pp.length?'Present: '+pp.map(i=>nm(i)+' ('+NPCS[i].role+')').join(', '):'Nobody is here.');
+ const ol=objs(r);say('Things of interest:');ol.length?ol.forEach(o=>say('- '+OB[o[0]].label)):say('- (nothing obvious)','c-dim');say('Anomalies detected: '+ol.filter(o=>o[2]).length,'c-dim')};
+C.take=a=>{const t=findThing(a[0]);if(!t||t.t!=='obj'){say(NOTAVAIL,'c-err');return}const o=OB[t.id];
+ if(t.dir==='inventory'){say('You already have it.');return}if(t.dir!==ROOMS[heroRoom()].dir){say(NOTAVAIL,'c-err');return}
+ if(!o.take){say('ERROR: You cannot take that.','c-err');return}spend(1);if(o.onTake)o.onTake();else{give(o.id);if(o.ev&&!S.found[o.ev])found(o.ev,typeof o.insp==='function'?o.insp():o.insp)}plog('take','Took '+o.label+'.')};
+C.use=a=>{const t=findThing(a[0]);if(!t||t.t!=='obj'){say(NOTAVAIL,'c-err');return}const o=OB[t.id];
+ if(t.dir!=='inventory'&&t.dir!==ROOMS[heroRoom()].dir){say(NOTAVAIL,'c-err');return}spend(2);
+ if(o.use){o.use(a.slice(1));plog('use','Used '+o.label+'.');return}say('Nothing happens. Try inspect '+o.id+'.','c-dim')};
+C.talk=a=>{const n=findNpc(a[0]);if(!n){say(a[0]?NOTAVAIL:'ERROR: Usage: talk <name> [topic]','c-err');return}
+ if(npcLoc(n)===curRoom()){S.flags['t_'+n]=1}
+ if(npcLoc(n)!==heroRoom()){say('ERROR: '+nm(n)+' is not here.','c-err');return}const N=NPCS[n],q=a.slice(1).join(' ').toLowerCase();
+ const open=N.topics.filter(x=>!x.when||x.when());
+ if(!q){spend(1);npcSay(n,S.trust[n]<30?'Make it quick.':S.trust[n]<60?'Yes? What is it?':'Go ahead, Mr. Miller.');say('Topics:','c-dim');open.forEach(x=>say('  talk '+n+' '+x.k.padEnd(9)+' - '+x.label,'c-dim'));return}
+ const tp=open.find(x=>x.k.startsWith(q)||x.label.toLowerCase().includes(q));
+ if(!tp){spend(1);npcSay(n,'I do not know anything about that.');return}
+ spend(3);plog('talk','Asked '+nm(n)+' about '+tp.k+'.');
+ if(tp.need&&!tp.need()){(tp.fail||['Not now.']).forEach(l=>npcSay(n,l));return}
+ (tp.need&&tp.say2?tp.say2:tp.say).forEach(l=>npcSay(n,l));if(tp.fx)tp.fx()};
+C.status=()=>{const r=heroRoom();say('TIME '+fmt(S.t)+'   LOCATION '+ROOMS[r].name,'c-hd');say('Suspicion: '+S.susp+'%   Evidence: '+ev10()+'/10   Leads: '+sec5()+'/5');
+ say('Attitudes:');Object.keys(NPCS).forEach(id=>say('  '+nm(id).padEnd(16)+trustLabel(S.trust[id])+(npcLoc(id)===r?'  (here)':''),'c-dim'));
+ say('Case: '+(S.done?'Chapter '+CH.n+' complete.':'Chapter '+CH.n+', in progress.'),'c-dim')};
+C.map=()=>{say(CH.mapName,'c-hd');Object.keys(ROOMS).filter(k=>ROOMS[k].dir).forEach(k=>{const pp=peopleIn(k);const lk=roomLock(k);say('  '+ROOMS[k].dir.padEnd(10)+' '+ROOMS[k].name.padEnd(30)+(pp.length?pp.map(nm).join(', '):'-')+(lk&&k!==heroRoom()?'  [locked]':'')+(k===heroRoom()?'  <- you':''),k===heroRoom()?'c-ok':'')})};
+const leads=()=>CH.leads();
+C.journal=()=>{say('=== CASE JOURNAL ===','c-hd');say(CH.name);say(CH.brief);say('');say('LEADS','c-hd');leads().forEach(l=>say(' - '+l));say('');say('RECENT EVENTS','c-hd');S.log.filter(l=>l.who==='world').slice(-5).forEach(l=>say(fmt(l.t)+' - '+l.txt,'c-dim'))};
+C.log=()=>{say('WORLD EVENT LOG','c-hd');S.log.slice(-25).forEach(l=>say(fmt(l.t)+' - '+(l.who==='player'?'You: ':'')+l.txt,l.who==='player'?'':'c-dim'))};
+C.evidence=a=>{const ids=Object.keys(EV).sort((x,y)=>EV[x].n-EV[y].n);if(a[0]){const id=ids.find(x=>String(EV[x].n)===a[0]);if(!id||!S.found[id]){say(NOTAVAIL,'c-err');return}say(EV[id].title,'c-hd');say(S.evtxt[id]);return}
+ say('EVIDENCE ('+ev10()+'/10)','c-hd');ids.forEach(id=>say('  ['+(S.found[id]?'x':' ')+'] #'+String(EV[id].n).padStart(2,'0')+' '+(S.found[id]?EV[id].title+'  (found '+fmt(S.found[id])+')':'???'),S.found[id]?'':'c-dim'))};
+C.wait=a=>{const n=clamp(parseInt(a[0])||5,1,120);say('Time passes... ('+n+' min)','c-dim');spend(n)};
+const userOK=p=>{const k=p.join('/');return k==='notes'||k==='inventory'||S.userdirs.includes(k)||k===''};
+C.mkdir=a=>{if(!a[0]){say('ERROR: Usage: mkdir <name>','c-err');return}const p=resolve(a[0]);const par=p.slice(0,-1);if(!userOK(par)){say('ERROR: Permission denied. You can only make folders in your own notes.','c-err');return}if(isDir(p)){say('ERROR: Already exists.','c-err');return}S.userdirs.push(p.join('/'));say('Created '+p.join('/')+'/','c-ok')};
+C.touch=a=>{if(!a[0]){say('ERROR: Usage: touch <file>','c-err');return}const p=resolve(a[0]);if(!userOK(p.slice(0,-1))){say('ERROR: Permission denied. You cannot leave files at a scene.','c-err');return}const k=p.join('/');if(S.userfs[k]!==undefined){say('ERROR: Already exists.','c-err');return}S.userfs[k]='';say('Created '+k,'c-ok')};
+C.write=a=>{if(a.length<2){say('ERROR: Usage: write <file> "text"','c-err');return}const k=resolve(a[0]).join('/');if(S.userfs[k]===undefined){say('ERROR: File does not exist. touch it first.','c-err');return}S.userfs[k]=a.slice(1).join(' ');say('Saved.','c-ok')};
+C.rm=a=>{const k=resolve(a[0]||'').join('/');if(S.userfs[k]!==undefined){delete S.userfs[k];say('Removed.');return}say('ERROR: Permission denied. Only your own notes can be removed.','c-err')};
+C.save=()=>{persist();say('Case saved ('+fmt(S.t)+').','c-ok')};
+C.reset=a=>{if(a[0]!=='confirm'){say('This erases your save. Type: reset confirm','c-warn');return}try{localStorage.removeItem(LS_SAVE)}catch(e){}applyPack(1);S=newState();OUT.push(['\u0000restart',''])};
+function finishChapter(){S.done=1;const F=CH.finish,m=meta();m['ch'+CH.n]=1;setMeta(m);
+ S.stats[CH.n]={ev:ev10(),sec:sec5(),trust:avgTrust(),susp:S.susp};if(CH.carry)Object.assign(S.car,CH.carry());
+ say('');say('================================','c-box');say(' '+F.title,'c-box');say('================================','c-box');F.lines.forEach(l=>say(l));say('');
+ say('Evidence discovered: '+ev10()+'/10');say('Leads uncovered: '+sec5()+'/5');say('NPC trust: '+avgTrust()+'%');say('Suspicion level: '+S.susp+'%');
+ if(PACKS[CH.n+1]){say('');say('NEW LEAD UNLOCKED:','c-ok');say(F.tease[0],'c-ok');say(F.tease[1],'c-dim');say('');say('Type next to begin Chapter '+(CH.n+1)+'. You can keep exploring first.','c-ok');S.flags.canNext=1}}
+C.next=()=>{if(!S.done||!PACKS[CH.n+1]){say('ERROR: There is no next chapter yet. Finish this one first.','c-err');return}beginChapter(CH.n+1);OUT.push(['\u0000chapter',CH.n])};
+/* ===== DISPATCH ===== */
+function run(line){OUT=[];COST=0;const a=tok(line.trim());const cmd=(a.shift()||'').toLowerCase();S.count++;if(!cmd)return OUT;
+ if(!C[cmd]||!S.cmds.includes(cmd)){say('ERROR: command not found: '+cmd+'. Type help.','c-err');return OUT}
+ C[cmd](a);if(COST>0)advance(COST);
+ if(S.flags.lead&&!S.done)finishChapter();
+ persist();return OUT}
+function complete(v){const parts=v.split(/\s+/),last=parts[parts.length-1];let c=[];
+ if(parts.length===1)c=S.cmds.concat(['menu','notebook','todo']);else{const i=last.lastIndexOf('/');const dir=last.slice(0,i+1);const p=dir?resolveDir(dir):S.cwd.slice();
+  if(p){c=listDir(p).map(x=>dir+(x[1]==='dir'?x[0]+'/':x[0].replace(/\.npc$/,'')));if(!dir){c=c.concat(Object.keys(NPCS),Object.values(ROOMS).filter(r=>r.dir).map(r=>r.dir));listDir(['inventory']).forEach(x=>c.push(x[0]));Object.keys(S.found).forEach(x=>c.push(x))}}}
+ return[...new Set(c)].filter(x=>x.toLowerCase().startsWith(last.toLowerCase()))}
+/* ===== UI: TERMINAL + STATUS STRIP ===== */
+const $=s=>document.querySelector(s);const outEl=$('#out'),inp=$('#in'),cmdEl=$('#cmdline'),typedEl=$('#typed');
+let Q=[],timer=null,hist=[],hi=0;
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function mk(t,c){const d=document.createElement('div');d.className='l '+(c||'');
+ const m=/^(\s{2,})([a-z_]+)(\s+- .*)$/.exec(t);
+ if(m){d.append(m[1]);const s=document.createElement('span');s.className='hc';s.textContent=m[2];d.append(s,m[3])}else d.textContent=t;return d}
+function put(d){outEl.insertBefore(d,cmdEl);outEl.scrollTop=outEl.scrollHeight}
+function clearOut(){outEl.querySelectorAll('.l').forEach(x=>x.remove())}
+function render(it){const t=it[0],c=it[1];if(t==='\u0000clear'){clearOut();return}if(t==='\u0000restart'){boot(true);return}if(t==='\u0000chapter'){chapterStart(c||CH.n);return}if(t==='\u0000ending'){endingStart(c);return}put(mk(t,c))}
+function echo(line){const d=document.createElement('div');d.className='l echo';const a=document.createElement('span');a.className='ps';a.textContent=ps()+' ';d.append(a,line);put(d)}
+function pump(){if(!Q.length){timer=null;return}let n=Q.length>60?6:Q.length>25?3:1;while(n--&&Q.length)render(Q.shift());timer=setTimeout(pump,reduce?0:12)}
+function enqueue(a){Q.push(...a);if(!timer)pump()}
+function flush(){clearTimeout(timer);timer=null;while(Q.length)render(Q.shift())}
+function ps(){return 'miller@harbor:'+pstr(S.cwd)+'$'}
+function execLine(line){if(menuOpen||introOn)return;flush();echo(line);if(line.trim()){hist.push(line);hi=hist.length}
+ const w=line.trim().toLowerCase();if(w==='menu'){showMenu();return}if(w==='todo'||w==='notebook'){nbToggle();return}if(w==='intro'){playIntro(()=>{inp.focus();mirror()});return}
+ const o=run(line);enqueue(o);refresh();cloudSave()}
+function mirror(){const v=inp.value,p=inp.selectionStart==null?v.length:inp.selectionStart;
+ typedEl.textContent=v.slice(0,p);const c=$('#cur');c.textContent='';
+ let after=$('#after');if(!after){after=document.createElement('span');after.id='after';after.className='typed';cmdEl.insertBefore(after,inp)}after.textContent=v.slice(p);
+ if(after.previousSibling!==c)cmdEl.insertBefore(c,after)}
+inp.addEventListener('input',mirror);inp.addEventListener('keyup',mirror);inp.addEventListener('click',mirror);
+inp.addEventListener('keydown',e=>{
+ if(e.key==='Enter'){const v=inp.value;inp.value='';mirror();execLine(v)}
+ else if(e.key==='ArrowUp'){if(hi>0){hi--;inp.value=hist[hi]||''}e.preventDefault();setTimeout(mirror)}
+ else if(e.key==='ArrowDown'){if(hi<hist.length){hi++;inp.value=hist[hi]||''}e.preventDefault();setTimeout(mirror)}
+ else if(e.key==='Tab'){e.preventDefault();doTab();mirror()}
+ else if(e.key==='l'&&e.ctrlKey){e.preventDefault();clearOut()}
+ else flush()});
+function setInput(v){inp.value=v;inp.focus();mirror();outEl.scrollTop=outEl.scrollHeight}
+const COARSE=matchMedia('(pointer:coarse)').matches;
+$('#term').addEventListener('click',e=>{if(COARSE||e.target.closest('#quick'))return;if(!getSelection().toString())inp.focus()});
+$('#out').addEventListener('click',e=>{if(COARSE&&!getSelection().toString())inp.focus()});
+function doTab(){const v=inp.value,parts=v.split(/\s+/),last=parts[parts.length-1];const m=complete(v);if(!m.length)return;
+ if(m.length===1){parts[parts.length-1]=m[0];inp.value=parts.join(' ')+(m[0].endsWith('/')?'':' ');return}
+ let pre=m[0];m.forEach(x=>{while(!x.toLowerCase().startsWith(pre.toLowerCase()))pre=pre.slice(0,-1)});
+ if(pre.length>last.length){parts[parts.length-1]=pre;inp.value=parts.join(' ')}else{flush();echo(v);put(mk(m.join('   '),'c-dim'))}}
+
+/* status strip */
+const missionLine=()=>CH.mission(),phase=()=>CH.phase();
+function quick(){const q=$('#quick');if(!q||!S)return;q.textContent='';
+ const add=(label,cmd,cls)=>{const b=document.createElement('button');b.type='button';b.textContent=label;if(cls)b.className=cls;b.addEventListener('click',()=>{if(cmd==='\u0000kb'){inp.focus();return}execLine(cmd)});q.append(b)};
+ if(S.done&&S.flags.canNext&&PACKS[CH.n+1])add('\u25B6 Next chapter','next','ctx');
+ if(!S.cwd.length)add('cd locations','cd locations','ctx');
+ else listDir(S.cwd).forEach(e=>{const n=e[0];if(e[1]==='dir')add('cd '+n,'cd '+n,'ctx');else if(e[1]==='npc')add('talk '+n.replace('.npc',''),'talk '+n.replace('.npc',''),'ctx');else if(/\.txt$/.test(n)&&S.cwd[0]!=='evidence')add('cat '+n,'cat '+n,'ctx');else if(/\.(obj|item)$/.test(n))add('inspect '+n.replace(/\.[a-z]+$/,''),'inspect '+n.replace(/\.[a-z]+$/,''),'ctx')});
+ if(S.cwd.length)add('cd ..','cd ..');
+ [['ls','ls'],['notebook','notebook'],['observe','observe'],['journal','journal'],['evidence','evidence'],['wait 15','wait 15'],['help','help'],['menu','menu']].forEach(x=>add(x[0],x[1]));
+ add('\u2328 Type','\u0000kb')}
+function refresh(){$('#clock').textContent=fmt(S.t);$('#date').textContent=CH.date;$('#maptitle').textContent=(CH.n===1?'Harbor City \u00B7 ':'')+CH.map.street+(CH.n>1?' \u00B7 Ch. '+CH.n:'');
+ $('#task').textContent=missionLine();
+ const b=$('#suspbar');b.style.width=S.susp+'%';b.style.background=S.susp>=70?'var(--red)':S.susp>=40?'var(--amber)':'var(--teal)';$('#suspn').textContent=S.susp+'%';
+ const fk=Object.keys(S.found).sort((a,b)=>EV[a].n-EV[b].n);$('#evn').textContent=ev10()+'/10';
+ const el=$('#evl');el.textContent='';(fk.length?fk.slice(-3):[]).forEach(k=>{const li=document.createElement('li');li.textContent=EV[k].title;el.append(li)});
+ if(fk.length>3){const li=document.createElement('li');li.style.color='var(--dim)';li.textContent='+'+(fk.length-3)+' more';el.append(li)}
+ if(!fk.length){const li=document.createElement('li');li.style.color='var(--dim)';li.textContent='None yet';el.append(li)}
+ $('#mstat').textContent=S.done?'Chapter complete':'In progress';$('#mphase').textContent=phase()+' \u00B7 Leads '+sec5()+'/5';
+ const ew=S.log.filter(l=>l.who==='world').slice(-3).reverse();const et=$('#evt');et.textContent='';
+ ew.forEach(l=>{const li=document.createElement('li');const a=document.createElement('b');a.textContent=fmt(l.t);const s=document.createElement('span');s.textContent=l.txt;li.append(a,s);et.append(li)});
+ if(!ew.length){const li=document.createElement('li');li.style.color='var(--dim)';li.textContent='Nothing yet';et.append(li)}
+ $('#ps').textContent=ps()+' ';mapSync();quick();if(!$('#nb').hidden)todoRender();wake()}
+/* ===== UI: MAP (top-down Harbor City, walking sprites) ===== */
+const W=720,H=600,GROUND='#0f151d';
+const L={
+ agency:{r:[20,24,180,180],door:[110,204],rp:[110,210],top:1,ic:'case',fl:'wood',t:'Miller Agency'},
+ lobby:{r:[268,24,180,180],door:[358,204],rp:[358,210],top:1,ic:'hall',fl:'marble',t:'Bennett: Lobby'},
+ news:{r:[516,24,180,180],door:[606,204],rp:[606,210],top:1,ic:'doc',fl:'lino',t:'Bennett: Newsroom'},
+ apt:{r:[20,288,180,180],door:[110,288],rp:[110,282],top:0,ic:'home',fl:'rug',t:'Carter Apartment'},
+ base:{r:[268,288,180,180],door:[358,288],rp:[358,282],top:0,ic:'folder',fl:'conc',t:'Bennett: Basement'},
+ diner:{r:[516,288,180,180],door:[606,288],rp:[606,282],top:0,ic:'cup',fl:'check',t:"Rosie's Diner"}
+};
+const HALLS=[[234,210],[482,210],[234,282],[482,282],[358,282]];
+const SHORT={agency:'Agency',lobby:'Lobby',news:'Newsroom',apt:'Apartment',base:'Basement',diner:'Diner',street:'Street',away:'Away'};
+const TITLE={street:'Dock Street'};Object.keys(L).forEach(k=>TITLE[k]=L[k].t);
+let MAPCFG={street:'Dock Street',fx:['lamps']};
+const LOOK={hero:{hair:'#2a1f16',hat:'#3b3228'},emily:{hair:'#4a2f1c',hat:0,long:1},parker:{hair:'#333',hat:'#1f3a66'},wilson:{hair:'#777',hat:0,glasses:1},bennett:{hair:'#c8c8c8',hat:0}};
+const SLOT_T=[[.30,.66],[.50,.76],[.70,.66],[.40,.50],[.62,.50]];
+function slotPos(loc,i){if(loc==='street')return HALLS[i%5].slice();const R=L[loc].r,f=SLOT_T[i%5];const fy=L[loc].top?f[1]:1-f[1]+.18;return[R[0]+6+f[0]*(R[2]-12),R[1]+6+fy*(R[3]-12)]}
+const SP={};
+function applyMap(P){const M=P.map;MAPCFG=M;
+ Object.keys(L).forEach(k=>{const r=M.rooms[k];if(!r)return;L[k].t=r.t;L[k].ic=r.ic;L[k].fl=r.fl;L[k].kind=r.kind||k});
+ for(const k in TITLE)delete TITLE[k];TITLE.street=M.street;for(const k in SHORT)delete SHORT[k];SHORT.street=M.street.split(' ')[0];SHORT.away='Away';
+ Object.keys(L).forEach(k=>{TITLE[k]=L[k].t;SHORT[k]=L[k].t.indexOf(':')>0?L[k].t.split(':').pop().trim():L[k].t});
+ for(const k in LOOK)delete LOOK[k];Object.assign(LOOK,M.look);
+ for(const k in SP)delete SP[k];BG=null}
+function first(id){return id==='hero'?'You':NPCS[id].name.split(' ')[0]}
+function place(sp){sp.loc=sp.want;sp.tgt=sp.loc;sp.path=[];if(sp.loc==='away'){sp.hidden=true}else{sp.hidden=false;const p=slotPos(sp.loc,sp.idx);sp.x=p[0];sp.y=p[1]}}
+const LANES=[210,282];
+function legs(P,Q){if(Math.abs(P[1]-Q[1])<2)return[Q];const lane=LANES.includes(P[1]);return lane?[[Q[0],P[1]],Q]:[[P[0],Q[1]],Q]}
+function startLeg(sp){const to=sp.want,from=sp.loc;let pts=[],P=[sp.x,sp.y];
+ if(sp.hidden){const Q=L[to]?L[to].rp:slotPos('street',sp.idx);P=[-30,Q[1]];sp.x=P[0];sp.y=P[1];sp.hidden=false}
+ else if(L[from]){pts.push(L[from].door,L[from].rp);P=L[from].rp}
+ if(to==='away'){pts.push([-30,P[1]])}
+ else if(L[to]){pts.push(...legs(P,L[to].rp));pts.push(L[to].door,slotPos(to,sp.idx))}
+ else pts.push(...legs(P,slotPos('street',sp.idx)));
+ sp.tgt=to;sp.path=pts}
+function syncSp(sp,idx){if(reduce){sp.idx=idx;place(sp);return}
+ if(!sp.path.length){sp.idx=idx;if(sp.want!==sp.loc)startLeg(sp);else if(!sp.hidden){const p=slotPos(sp.loc,idx);if(Math.hypot(p[0]-sp.x,p[1]-sp.y)>3)sp.path=[p]}}}
+function mapSync(){const by={};Object.keys(NPCS).forEach(id=>{const l=npcLoc(id);(by[l]=by[l]||[]).push(id)});
+ Object.keys(NPCS).forEach(id=>{const want=npcLoc(id);let sp=SP[id];const idx=by[want].indexOf(id);
+  if(!sp){sp=SP[id]={id,want,idx,x:-40,y:210,path:[],face:1,ph:0,hidden:true};place(sp)}
+  sp.want=want;syncSp(sp,idx)});
+ const hw=heroRoom();let h=SP.hero;if(!h){h=SP.hero={id:'hero',want:hw,idx:4,x:358,y:282,path:[],face:1,ph:0,hidden:false};place(h)}
+ h.want=hw;syncSp(h,4)}
+function step(dt){Object.values(SP).forEach(sp=>{if(!sp.path.length)return;const t=sp.path[0],dx=t[0]-sp.x,dy=t[1]-sp.y,d=Math.hypot(dx,dy),v=(sp.want!==sp.tgt?150:sp.id==='hero'?115:85)*dt;
+ if(d<=v){sp.x=t[0];sp.y=t[1];sp.path.shift();if(!sp.path.length){sp.loc=sp.tgt;if(sp.loc==='away')sp.hidden=true;if(sp.want!==sp.loc)startLeg(sp)}}
+ else{sp.x+=dx/d*v;sp.y+=dy/d*v;if(Math.abs(dx)>.5)sp.face=dx>0?1:-1;sp.ph+=dt}})}
+
+/* static background, drawn once at 2x */
+let BG=null;
+function makeBG(){const c=document.createElement('canvas');c.width=W*2;c.height=H*2;const g=c.getContext('2d');g.scale(2,2);
+ const R=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)};
+ R(0,0,W,H,GROUND);
+ R(0,204,W,12,'#1b2530');R(0,276,W,12,'#1b2530');R(200,0,12,H-120,'#1b2530');R(256,0,12,H-120,'#1b2530');R(448,0,12,H-120,'#1b2530');R(504,0,12,H-120,'#1b2530');
+ R(0,216,W,60,'#131920');R(212,0,44,H-120,'#131920');R(460,0,44,H-120,'#131920');
+ g.fillStyle='rgba(255,255,255,.035)';for(let x=0;x<W;x+=12){g.fillRect(x,207,1,6);g.fillRect(x,279,1,6)}
+ g.fillStyle='#283340';for(let x=0;x<W;x+=24){if(!((x>196&&x<262)||(x>444&&x<510)))g.fillRect(x,245,14,2)}for(let y=0;y<480;y+=24){if(y<212||y>278){g.fillRect(233,y,2,14);g.fillRect(481,y,2,14)}}
+ g.fillStyle='#3a4552';[110,358,606].forEach(x=>{for(let i=0;i<6;i++)g.fillRect(x-16,219+i*9.5,32,4)});
+ R(0,476,W,16,'#2a2118');for(let x=0;x<W;x+=14)R(x,476,1,16,'#1a140e');R(0,492,W,108,'#0c1a26');
+ g.fillStyle='#2a2118';[[560,492,16,70],[640,492,16,52],[90,492,16,40]].forEach(p=>g.fillRect(p[0],p[1],p[2],p[3]));
+ g.fillStyle='#3a2f22';[[553,492,30,6],[633,492,30,6]].forEach(p=>g.fillRect(p[0],p[1],p[2],p[3]));
+ [[236,110],[236,170],[484,110],[484,170],[236,380],[484,380],[236,440],[484,440],[34,250],[700,250]].forEach(p=>{g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(p[0]+2,p[1]+5,12,8,0,0,7);g.fill();g.fillStyle='#1a3426';g.beginPath();g.arc(p[0],p[1],12,0,7);g.fill();g.fillStyle='#235038';g.beginPath();g.arc(p[0]-3,p[1]-3,6,0,7);g.fill()});
+ Object.keys(L).forEach(k=>{const B=L[k],r=B.r,x=r[0],y=r[1],w=r[2],h=r[3];
+  R(x-3,y-3,w+6,h+6,'#06090d');R(x,y,w,h,'#29323d');const ix=x+6,iy=y+6,iw=w-12,ih=h-12;
+  const tiles=(a,b,s)=>{for(let i=0;i<iw;i+=s)for(let j=0;j<ih;j+=s)R(ix+i,iy+j,s,s,((i+j)/s)%2?a:b)};
+  if(B.fl==='wood'){R(ix,iy,iw,ih,'#7a6247');g.fillStyle='rgba(0,0,0,.14)';for(let j=0;j<ih;j+=10)g.fillRect(ix,iy+j,iw,1)}
+  else if(B.fl==='marble')tiles('#8d8d86','#6f6f6a',14);else if(B.fl==='lino'){R(ix,iy,iw,ih,'#6d7a72');g.fillStyle='rgba(0,0,0,.1)';for(let i=0;i<iw;i+=16)g.fillRect(ix+i,iy,1,ih)}
+  else if(B.fl==='rug'){R(ix,iy,iw,ih,'#7a6656');g.fillStyle='rgba(0,0,0,.12)';for(let j=0;j<ih;j+=9)g.fillRect(ix,iy+j,iw,1)}
+  else if(B.fl==='conc'){R(ix,iy,iw,ih,'#4a4e52');g.fillStyle='rgba(0,0,0,.12)';for(let i=0;i<10;i++)g.fillRect(ix+(i*37)%iw,iy+(i*53)%ih,30,18)}
+  else if(B.fl==='steel'){R(ix,iy,iw,ih,'#3d454d');g.fillStyle='rgba(255,255,255,.06)';for(let i=0;i<iw;i+=24)g.fillRect(ix+i,iy,1,ih);for(let j=0;j<ih;j+=24)g.fillRect(ix,iy+j,iw,1)}
+  else if(B.fl==='plank'){R(ix,iy,iw,ih,'#6a5238');g.fillStyle='rgba(0,0,0,.2)';for(let i=0;i<iw;i+=9)g.fillRect(ix+i,iy,1,ih)}
+  else if(B.fl==='tile')tiles('#9a9a94','#85857f',12);
+  else if(B.fl==='dirt'){R(ix,iy,iw,ih,'#3d3226');g.fillStyle='rgba(0,0,0,.2)';for(let i=0;i<40;i++)g.fillRect(ix+(i*37)%iw,iy+(i*53)%ih,8,3)}
+  else if(B.fl==='ice'){R(ix,iy,iw,ih,'#8fb0c0');g.fillStyle='rgba(255,255,255,.25)';for(let i=0;i<14;i++)g.fillRect(ix+(i*41)%iw,iy+(i*29)%ih,26,2)}
+  else tiles('#8a3a38','#cfc8bc',12);
+  const gr=g.createRadialGradient(x+w/2,y+h/2,20,x+w/2,y+h/2,w*.66);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,k==='base'?'rgba(2,4,8,.8)':'rgba(4,8,14,.6)');g.fillStyle=gr;g.fillRect(ix,iy,iw,ih);
+  const dx=B.door[0],dy=B.top?y+h-6:y;R(dx-15,dy,30,6,'#5a4630');R(dx-15,dy+(B.top?0:5),30,1,'#8a6a44');
+  const kd=B.kind||k;if(INT[kd])INT[kd](g,R,ix,iy,iw,ih);
+ });
+ return c}
+/* ===== MAP INTERIORS: one drawer per room kind (chapter packs pick the kind) ===== */
+const INT={};
+const _r=(g,ix,iy)=>(a,b,w,h,c)=>{g.fillStyle=c;g.fillRect(ix+a,iy+b,w,h)};
+const _c=(g,ix,iy)=>(a,b,rad,c)=>{g.fillStyle=c;g.beginPath();g.arc(ix+a,iy+b,rad,0,7);g.fill()};
+/* chapter 1 rooms */
+INT.agency=(g,R,ix,iy,iw,ih)=>{R(ix+8,iy+8,70,12,'#3d2c20');R(ix+iw-26,iy+10,20,46,'#3a4448');R(ix+30,iy+62,84,26,'#4a2f1f');R(ix+30,iy+62,84,5,'#6b4630');R(ix+38,iy+54,10,8,'#2a6a4a');R(ix+78,iy+52,16,10,'#222');R(ix+54,iy+34,18,18,'#2b2b30');R(ix+56,iy+104,16,16,'#5a2a2a');R(ix+90,iy+104,16,16,'#5a2a2a');R(ix+20,iy+126,120,34,'#5a2f2a');R(ix+22,iy+128,116,30,'#6a3a34')};
+INT.lobby=(g,R,ix,iy,iw,ih)=>{R(ix+20,iy+22,128,20,'#3b2c20');R(ix+20,iy+22,128,4,'#5b4430');R(ix+iw-40,iy+6,30,40,'#8a7a50');R(ix+iw-26,iy+6,2,40,'#4a3e28');R(ix+12,iy+114,50,10,'#4a3524');g.fillStyle='#1c3a2a';g.beginPath();g.arc(ix+14,iy+14,9,0,7);g.arc(ix+iw-14,iy+ih-14,9,0,7);g.fill();R(ix+70,iy+56,28,14,'#2b2018')};
+INT.news=(g,R,ix,iy,iw,ih)=>{for(let i=0;i<2;i++)for(let j=0;j<2;j++){const ox=ix+14+i*80,oy=iy+34+j*58;R(ox,oy,60,26,'#5a4a38');R(ox+10,oy+4,22,12,'#1b222b');R(ox+38,oy+5,14,10,'#e8e4da');R(ox+22,oy+28,14,10,'#1b222b')}R(ix+14,iy+8,100,10,'#8a6a40');R(ix+iw-26,iy+ih-30,18,22,'#333')};
+INT.apt=(g,R,ix,iy,iw,ih)=>{R(ix+10,iy+10,56,38,'#8a5050');R(ix+12,iy+12,16,12,'#d9d2c4');R(ix+90,iy+80,50,34,'#6b5038');R(ix+iw-22,iy+8,16,80,'#43322a');for(let i=0;i<8;i++)R(ix+iw-20,iy+10+i*9,12,6,['#8a4b3a','#3a6a8a','#7a7a3a','#5a3a7a'][i%4]);R(ix+10,iy+100,34,30,'#44563c');R(ix+96,iy+84,10,6,'#222');R(ix+10,iy+ih-22,28,14,'#4a3a2a')};
+INT.base=(g,R,ix,iy,iw,ih)=>{R(ix,iy+4,iw,4,'#6a5a4a');for(let i=0;i<3;i++){const sy=iy+22+i*44;R(ix+10,sy,iw-34,14,'#3f3f44');for(let j=0;j<8;j++)R(ix+14+j*17,sy-6,12,8,'#8a7048')}R(ix+iw-8,iy+70,8,34,'#2a2a30')};
+INT.diner=(g,R,ix,iy,iw,ih)=>{R(ix+14,iy+20,140,16,'#cfd2d6');g.fillStyle='#8a2a2a';for(let i=0;i<6;i++){g.beginPath();g.arc(ix+26+i*22,iy+46,5,0,7);g.fill()}R(ix+10,iy+92,50,40,'#8a2a2a');R(ix+66,iy+92,40,40,'#5a2020');R(ix+iw-30,iy+70,22,34,'#c8a040')};
+/* chapter 2: the pier */
+INT.bar=(g,R,ix,iy,iw,ih)=>{R(ix+10,iy+8,148,8,'#2a1a10');for(let i=0;i<12;i++)R(ix+14+i*12,iy+2,5,10,['#3a6a4a','#8a5a2a','#6a3a3a','#4a5a7a'][i%4]);R(ix+10,iy+34,148,14,'#4a2f1c');R(ix+10,iy+34,148,3,'#8a6340');for(let i=0;i<6;i++){g.fillStyle='#2a2018';g.beginPath();g.arc(ix+24+i*24,iy+60,6,0,7);g.fill()}R(ix+14,iy+100,44,30,'#5a3a22');R(ix+98,iy+104,44,30,'#5a3a22');R(ix+20,iy+140,12,12,'#2a2018');R(ix+120,iy+144,12,12,'#2a2018')};
+INT.gate=(g,R,ix,iy,iw,ih)=>{R(ix+34,iy+14,100,70,'#43534a');R(ix+34,iy+14,100,6,'#2a352e');R(ix+56,iy+30,56,22,'#1c2a32');R(ix+52,iy+96,64,20,'#5a4630');R(ix+iw-16,iy+14,10,56,'#6a4a2a');for(let i=0;i<5;i++)R(ix+iw-14,iy+18+i*10,6,3,'#d9b24a');R(ix+8,iy+110,22,32,'#2a2a2a');R(ix+8,iy+108,22,3,'#6a3a2a')};
+INT.dockoffice=(g,R,ix,iy,iw,ih)=>{R(ix+12,iy+8,72,34,'#c9c2a8');R(ix+16,iy+14,64,2,'#4a6a8a');R(ix+34,iy+22,2,10,'#c04040');R(ix+100,iy+8,40,26,'#8a6a40');R(ix+iw-34,iy+8,26,56,'#4d5b52');R(ix+30,iy+70,90,30,'#5a3a22');R(ix+30,iy+70,90,4,'#7a5a3a');R(ix+52,iy+104,24,14,'#2a2018');R(ix+88,iy+62,14,8,'#222')};
+INT.warehouse=(g,R,ix,iy,iw,ih)=>{for(let r=0;r<2;r++)for(let c=0;c<4;c++){R(ix+10+c*34,iy+10+r*30,30,26,'#7a5a34');R(ix+10+c*34,iy+10+r*30,30,3,'#9a7a4a');R(ix+22+c*34,iy+10+r*30,3,26,'#5a3a24')}R(ix+14,iy+96,34,16,'#6a6a52');R(ix+14,iy+96,34,3,'#8a8a6a');R(ix+70,iy+94,3,40,'#555');R(ix+iw-40,iy+100,28,36,'#7a5a34');R(ix+iw-40,iy+100,28,36,'#7a5a34');R(ix+iw-30,iy+100,3,36,'#5a3a24')};
+INT.boatshed=(g,R,ix,iy,iw,ih)=>{R(ix+16,iy+66,128,30,'#5a4a3a');R(ix+24,iy+60,112,8,'#8a7a5a');R(ix+34,iy+72,92,4,'#3a2a1a');R(ix+8,iy+8,66,28,'#3a4a3a');g.fillStyle='rgba(0,0,0,.25)';for(let i=0;i<8;i++)g.fillRect(ix+8+i*8,iy+8,1,28);R(ix+iw-30,iy+110,18,24,'#5a3a22');R(ix+iw-30,iy+110,18,3,'#8a6a3a');R(ix+20,iy+118,50,3,'#7a6a4a')};
+INT.market=(g,R,ix,iy,iw,ih)=>{R(ix+10,iy+30,64,24,'#6a7a8a');R(ix+10,iy+30,64,4,'#9ab0c2');R(ix+84,iy+30,64,24,'#6a7a8a');R(ix+84,iy+30,64,4,'#9ab0c2');R(ix+20,iy+104,40,26,'#7a5a34');R(ix+66,iy+108,40,22,'#7a5a34');R(ix+iw-50,iy+84,40,52,'#566b78');R(ix+iw-44,iy+92,28,6,'#2a3038')};
+/* chapter 3: the civic day */
+INT.cityhall=(g,R,ix,iy,iw,ih)=>{R(ix+14,iy+14,140,24,'#3b2c20');R(ix+18,iy+18,132,14,'#9ab0c2');for(let i=0;i<5;i++)R(ix+30+i*26,iy+18,3,14,'#3b2c20');for(let i=0;i<2;i++){R(ix+16+i*120,iy+64,12,60,'#cfc9b8');R(ix+14+i*120,iy+62,16,5,'#b8b19c')}R(ix+60,iy+96,50,18,'#4a3524');R(ix+78,iy+130,14,18,'#7a1f1a')};
+INT.records=(g,R,ix,iy,iw,ih)=>{for(let i=0;i<4;i++){R(ix+10,iy+10+i*20,150,14,'#4a3a2a');for(let j=0;j<18;j++)R(ix+12+j*8,iy+12+i*20,6,10,['#8a7a5a','#6a5a3a','#7a4a3a'][j%3])}R(ix+96,iy+100,52,28,'#5a4630');R(ix+104,iy+92,18,10,'#222');R(ix+20,iy+110,22,22,'#6a3a2a')};
+INT.newsroom2=(g,R,ix,iy,iw,ih)=>{R(ix+8,iy+8,60,32,'#6a7a82');R(ix+10,iy+10,56,28,'#9ab0b8');for(let i=0;i<2;i++)for(let j=0;j<2;j++){const ox=ix+16+i*74,oy=iy+56+j*50;R(ox,oy,56,24,'#5a4a38');R(ox+8,oy+4,20,12,'#2a2a2a');R(ox+34,oy+6,14,10,'#e8e4da')}R(ix+iw-32,iy+8,22,84,'#4d4a46');for(let i=0;i<5;i++)R(ix+iw-30,iy+12+i*16,18,3,'#8a8a82')};
+INT.precinct=(g,R,ix,iy,iw,ih)=>{R(ix+10,iy+66,110,14,'#5a4630');R(ix+10,iy+66,110,3,'#8a6a44');R(ix+16,iy+84,20,18,'#2a3a5a');for(let i=0;i<5;i++)R(ix+iw-48+i*9,iy+8,3,56,'#3a3a40');R(ix+iw-50,iy+8,48,4,'#3a3a40');R(ix+20,iy+14,40,28,'#8a8a60');R(ix+26,iy+20,28,16,'#cfd2d6');R(ix+30,iy+118,60,28,'#4a3524')};
+INT.house=(g,R,ix,iy,iw,ih)=>{R(ix+8,iy+8,50,30,'#6a4a3a');R(ix+10,iy+10,18,12,'#d9d2c4');R(ix+iw-28,iy+8,18,70,'#43322a');for(let i=0;i<6;i++)R(ix+iw-26,iy+10+i*11,14,7,['#8a4b3a','#3a6a8a','#7a7a3a'][i%3]);R(ix+20,iy+60,70,40,'#5a3a4a');R(ix+34,iy+70,42,18,'#7a5a6a');R(ix+100,iy+100,40,26,'#4a3a2a');R(ix+104,iy+104,32,18,'#cfc9b8');R(ix+110,iy+108,6,6,'#222');R(ix+122,iy+108,6,6,'#cfc9b8')};
+/* chapter 4: the cannery */
+INT.yard=(g,R,ix,iy,iw,ih)=>{R(ix+14,iy+34,76,30,'#3a4a5a');R(ix+90,iy+40,22,24,'#2a3a4a');R(ix+22,iy+64,12,6,'#111');R(ix+74,iy+64,12,6,'#111');R(ix+116,iy+24,18,24,'#6a5a3a');R(ix+138,iy+30,18,24,'#6a5a3a');R(ix+16,iy+108,70,10,'#5a4630');R(ix+18,iy+118,4,18,'#3a2a1a');R(ix+80,iy+118,4,18,'#3a2a1a');g.fillStyle='rgba(120,150,170,.35)';g.beginPath();g.ellipse(ix+110,iy+130,22,8,0,0,7);g.fill();for(let i=0;i<16;i++)R(ix+i*11,iy+4,2,12,'#555')};
+INT.canoffice=(g,R,ix,iy,iw,ih)=>{R(ix+26,iy+64,100,30,'#4a4f56');R(ix+26,iy+64,100,4,'#6a7078');R(ix+34,iy+56,12,8,'#2a6a4a');R(ix+100,iy+54,14,10,'#222');R(ix+iw-30,iy+10,20,20,'#555');g.fillStyle='#aaa';g.beginPath();g.arc(ix+iw-20,iy+20,5,0,7);g.fill();R(ix+12,iy+10,26,32,'#e8e2d4');R(ix+12,iy+10,26,8,'#8a2a2a');R(ix+24,iy+102,28,16,'#2a2018')};
+INT.cannery=(g,R,ix,iy,iw,ih)=>{for(let i=0;i<3;i++){R(ix+8,iy+26+i*40,iw-30,10,'#3a3a40');for(let j=0;j<10;j++)R(ix+12+j*14,iy+22+i*40,8,6,'#9aa0a8')}R(ix+iw-18,iy+14,12,120,'#2a3038');R(ix+iw-16,iy+30,8,8,'#c04040');R(ix+20,iy+140,50,14,'#4a3a2a')};
+INT.coldroom=(g,R,ix,iy,iw,ih)=>{R(ix,iy,iw,6,'#b6d2de');R(ix,iy,6,ih,'#a2c0cf');R(ix+iw-6,iy,6,ih,'#a2c0cf');for(let i=0;i<10;i++)R(ix+(i*47)%iw,iy+(i*31)%ih,22,6,'rgba(255,255,255,.35)');R(ix+20,iy+70,60,24,'#5a5a50');R(ix+22,iy+66,56,6,'#8a8a78');R(ix+110,iy+60,22,26,'#3a4a58');R(ix+18,iy+120,30,18,'#2a3038')};
+INT.loft=(g,R,ix,iy,iw,ih)=>{R(ix+50,iy+8,70,30,'#101820');R(ix+54,iy+12,62,22,'#2a3a4a');R(ix+84,iy+8,2,30,'#101820');R(ix+20,iy+70,70,24,'#5a3a22');R(ix+24,iy+60,10,10,'#222');R(ix+120,iy+70,26,60,'#3a2a1a');for(let i=0;i<6;i++)R(ix+120,iy+74+i*10,26,2,'#5a4a2a')};
+INT.car=(g,R,ix,iy,iw,ih)=>{R(ix,iy,iw,ih,'#2a2d33');for(let i=0;i<8;i++)R(ix+iw/2-2,iy+8+i*22,4,12,'#a8a070');R(ix+50,iy+50,70,60,'#2b3b57');R(ix+58,iy+60,54,20,'#3d5578');R(ix+58,iy+84,54,16,'#3d5578');g.fillStyle='rgba(255,236,170,.4)';g.beginPath();g.moveTo(ix+56,iy+50);g.lineTo(ix+34,iy+14);g.lineTo(ix+136,iy+14);g.lineTo(ix+114,iy+50);g.fill();R(ix+52,iy+104,12,6,'#e5594f');R(ix+106,iy+104,12,6,'#e5594f')};
+/* drawing helpers */
+function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+function icon(g,k,x,y,col){g.strokeStyle=col;g.lineWidth=1.3;g.lineJoin='round';g.beginPath();
+ if(k==='case'){g.rect(x,y+3,12,8);g.moveTo(x+4,y+3);g.lineTo(x+4,y);g.lineTo(x+8,y);g.lineTo(x+8,y+3)}
+ else if(k==='folder'){g.moveTo(x,y+2);g.lineTo(x+5,y+2);g.lineTo(x+6.5,y+4);g.lineTo(x+12,y+4);g.lineTo(x+12,y+11);g.lineTo(x,y+11);g.closePath()}
+ else if(k==='lock'){g.rect(x+1,y+5,10,7);g.moveTo(x+3,y+5);g.arc(x+6,y+4,3,Math.PI,0)}
+ else if(k==='home'){g.moveTo(x,y+6);g.lineTo(x+6,y);g.lineTo(x+12,y+6);g.moveTo(x+2,y+5);g.lineTo(x+2,y+11);g.lineTo(x+10,y+11);g.lineTo(x+10,y+5)}
+ else if(k==='cup'){g.rect(x+1,y+3,8,8);g.moveTo(x+9,y+5);g.arc(x+9,y+7,2.5,-1.5,1.5);g.moveTo(x+3,y);g.lineTo(x+3,y+2);g.moveTo(x+6,y);g.lineTo(x+6,y+2)}
+ else if(k==='doc'){g.rect(x+1,y,10,12);g.moveTo(x+3,y+4);g.lineTo(x+9,y+4);g.moveTo(x+3,y+7);g.lineTo(x+9,y+7)}
+ else{g.moveTo(x+11,y+6);g.arc(x+6,y+6,5,0,7);g.moveTo(x+6,y+2);g.lineTo(x+8,y+6);g.lineTo(x+6,y+10);g.lineTo(x+4,y+6);g.closePath()}
+ g.stroke()}
+function chip(g,x,y,text,o){o=o||{};g.font='12px "IBM Plex Mono",monospace';const tw=g.measureText(text).width,w=tw+16+(o.ic?18:0)+(o.dot?12:0),h=o.h||22;
+ g.fillStyle='rgba(7,11,15,.9)';rr(g,x,y,w,h,2);g.fill();g.strokeStyle=o.stroke||'#2a3744';g.lineWidth=1;g.stroke();
+ let tx=x+8;if(o.ic){icon(g,o.ic,tx,y+(h-12)/2,o.col||'#d9dfe5');tx+=18}if(o.dot){g.fillStyle=o.dot;g.beginPath();g.arc(tx+3,y+h/2,3.5,0,7);g.fill();tx+=12}
+ g.fillStyle=o.col||'#d9dfe5';g.textBaseline='middle';g.fillText(text,tx,y+h/2+.5);return w}
+const NPC_OF=id=>id==='hero'?HERO:NPCS[id];
+function person(g,sp,hot){const N=NPC_OF(sp.id),lk=LOOK[sp.id]||{hair:'#222'},x=Math.round(sp.x),y=Math.round(sp.y),walk=sp.path.length>0,fr=walk?Math.floor(sp.ph*7)%2:0,bob=walk&&fr?-1:0;
+ const R=(a,b,w,h,c)=>{g.fillStyle=c;g.fillRect(a,b,w,h)};
+ g.fillStyle='rgba(0,0,0,.4)';g.beginPath();g.ellipse(x,y+1,8,3,0,0,7);g.fill();
+ if(hot){g.strokeStyle='#e3b552';g.lineWidth=1.5;g.beginPath();g.ellipse(x,y+1,12,5,0,0,7);g.stroke()}
+ const a=fr?6:4,b=fr?4:6;R(x-4,y-a,3,a,'#1b2330');R(x+1,y-b,3,b,'#1b2330');
+ const long=sp.id==='hero'||!!lk.coat;
+ R(x-5,y-17+bob,10,long?13:11,N.col);R(x-5,y-17+bob,10,2,'rgba(255,255,255,.25)');R(sp.face>0?x+4:x-6,y-16+bob,2,8,'rgba(0,0,0,.28)');
+ R(x-4,y-25+bob,8,8,'#e0b894');if(lk.long){R(sp.face>0?x-5:x+2,y-25+bob,3,11,lk.hair)}R(x-4,y-25+bob,8,3,lk.hair);R(sp.face>0?x+1:x-3,y-21+bob,2,2,'#1a1410');
+ if(lk.glasses)R(sp.face>0?x:x-4,y-22+bob,4,1,'#222');
+ if(lk.hat){R(x-5,y-27+bob,10,4,lk.hat);R(sp.face>0?x+2:x-8,y-24+bob,6,2,lk.hat)}}
+function tag(g,x,y,text,col){g.font='11px "IBM Plex Mono",monospace';const w=g.measureText(text).width+10;g.fillStyle='rgba(7,11,15,.85)';rr(g,x-w/2,y-8,w,16,2);g.fill();g.strokeStyle=col;g.lineWidth=1;g.stroke();g.fillStyle=text==='You'?'#38d27f':'#e6ebef';g.textBaseline='middle';g.textAlign='center';g.fillText(text,x,y+.5);g.textAlign='left'}
+
+/* frame */
+const cv=$('#map'),cx=cv.getContext('2d');let VW={s:1,ox:0,oy:0,d:1},hits=[],hover=null,mouse=null,last=0,raf=0;
+function resize(){const p=$('#world'),w=p.clientWidth,h=p.clientHeight,d=Math.min(2,devicePixelRatio||1);if(!w||!h)return;cv.width=Math.round(w*d);cv.height=Math.round(h*d);const s=Math.min(w/W,h/H);VW={s,ox:(w-W*s)/2,oy:(h-H*s)/2,d};wake()}
+new ResizeObserver(resize).observe($('#world'));
+function wake(){if(!raf)raf=requestAnimationFrame(frame)}
+function frame(ts){raf=0;const dt=Math.min(.05,(ts-last)/1000||0);last=ts;step(dt);draw(ts);if(!document.hidden&&(!reduce||Object.values(SP).some(s=>s.path.length)))raf=requestAnimationFrame(frame)}
+document.addEventListener('visibilitychange',wake);
+function draw(ts){const g=cx,d=VW.d||1;if(!BG)BG=makeBG();hits=[];
+ g.setTransform(1,0,0,1,0,0);g.fillStyle=GROUND;g.fillRect(0,0,cv.width,cv.height);g.setTransform(d*VW.s,0,0,d*VW.s,d*VW.ox,d*VW.oy);
+ g.imageSmoothingEnabled=false;g.drawImage(BG,0,0,W,H);g.imageSmoothingEnabled=true;
+ const cur=curRoom()||'street';
+ /* water shimmer */
+ g.fillStyle='rgba(120,170,210,.10)';for(let i=0;i<14;i++){const wx=((i*61+ts/60)%W),wy=500+(i*23)%90;g.fillRect(wx,wy,18,1)}
+ /* lamps */
+ const FX=MAPCFG.fx||[];if(FX.includes('day')){g.globalCompositeOperation='screen';g.fillStyle='rgba(120,112,92,.62)';g.fillRect(0,0,W,H);g.globalCompositeOperation='source-over'}
+ if(FX.includes('lamps')||FX.includes('rain')||FX.includes('fog')){g.globalCompositeOperation='lighter';[[206,210],[262,210],[454,210],[510,210],[206,282],[262,282],[454,282],[510,282],[110,210],[606,282]].forEach(p=>{const gr=g.createRadialGradient(p[0],p[1],0,p[0],p[1],36);gr.addColorStop(0,'rgba(255,200,110,.16)');gr.addColorStop(1,'rgba(255,200,110,0)');g.fillStyle=gr;g.fillRect(p[0]-36,p[1]-36,72,72)});g.globalCompositeOperation='source-over'}
+ if(FX.includes('fog')){for(let i=0;i<4;i++){const fx=((ts/90+i*190)%(W+360))-180,fy=100+i*110;const gr=g.createRadialGradient(fx,fy,10,fx,fy,170);gr.addColorStop(0,'rgba(190,205,220,.16)');gr.addColorStop(1,'rgba(190,205,220,0)');g.fillStyle=gr;g.fillRect(fx-180,fy-120,360,240)}}
+ if(FX.includes('rain')){g.strokeStyle='rgba(170,195,220,.35)';g.lineWidth=1;g.beginPath();for(let i=0;i<110;i++){const rx=(i*97+ts/4)%W,ry=((i*53)+ts*.9)%H;g.moveTo(rx,ry);g.lineTo(rx-3,ry+9)}g.stroke()}
+ /* car */
+ const cxp=reduce?420:((ts/1000*34)%(W+160))-80;g.fillStyle='rgba(0,0,0,.35)';g.fillRect(cxp-16,258,34,5);g.fillStyle='#2b3b57';g.fillRect(cxp-16,246,34,14);g.fillStyle='#3d5578';g.fillRect(cxp-8,248,18,10);g.fillStyle='#ffe6a0';g.fillRect(cxp+16,248,2,3);g.fillRect(cxp+16,255,2,3);g.fillStyle='#e5594f';g.fillRect(cxp-17,248,1,3);g.fillRect(cxp-17,255,1,3);
+ /* street hit + label */
+ hits.push({k:'room',id:'street',x:0,y:216,w:W,h:60});
+ if(hover&&hover.k==='room'&&hover.id==='street'||cur==='street'){g.strokeStyle=cur==='street'?'rgba(56,210,127,.55)':'rgba(227,181,82,.7)';g.lineWidth=1.5;g.setLineDash([6,4]);g.strokeRect(1,217,W-2,58);g.setLineDash([])}
+ chip(g,266,232,MAPCFG.street,{ic:'hall',col:cur==='street'?'#38d27f':'#7a8794',stroke:cur==='street'?'#1f5a3b':'#2a3744'});
+ /* rooms */
+ Object.keys(L).forEach(k=>{const B=L[k],r=B.r,on=cur===k,hov=hover&&hover.k==='room'&&hover.id===k;hits.push({k:'room',id:k,x:r[0],y:r[1],w:r[2],h:r[3]});
+  if(on||hov){g.strokeStyle=on?'rgba(56,210,127,.85)':'rgba(227,181,82,.9)';g.lineWidth=2.5;g.strokeRect(r[0]-1.5,r[1]-1.5,r[2]+3,r[3]+3)}
+  chip(g,r[0]+10,r[1]+10,B.t,{ic:B.ic,stroke:on?'#1f5a3b':'#2a3744'});
+  if(on){g.fillStyle='#38d27f';const by=r[1]+2+Math.sin(ts/300)*1.5;g.beginPath();g.moveTo(r[0]+20,by+6);g.lineTo(r[0]+28,by+6);g.lineTo(r[0]+24,by+11);g.fill()}
+  const lk=roomLock(k);if(lk&&!on)chip(g,r[0]+10,r[1]+36,'Locked',{ic:'lock',col:'#e3b552',stroke:'#5a4a22'});
+  objs(k).forEach((o,i)=>{const ox=r[0]+14+i*18,oy=r[1]+r[3]-24,an=o[2],hh=hover&&hover.k==='obj'&&hover.id===o[0];
+   g.fillStyle=an?'rgba(227,181,82,.22)':'rgba(108,192,216,.14)';g.strokeStyle=hh?'#fff':an?'#e3b552':'#6cc0d8';g.lineWidth=1.2;rr(g,ox,oy,13,13,2);g.fill();g.stroke();g.fillStyle=g.strokeStyle;g.fillRect(ox+5,oy+5,3,3);
+   hits.push({k:'obj',id:o[0],x:ox,y:oy,w:13,h:13})})});
+ /* street objects (newspaper box) */
+ objs('street').forEach((o,i)=>{const ox=300+i*18,oy=292,an=o[2];g.fillStyle=an?'rgba(227,181,82,.22)':'rgba(108,192,216,.14)';g.strokeStyle=an?'#e3b552':'#6cc0d8';g.lineWidth=1.2;rr(g,ox,oy-30,13,13,2);g.fill();g.stroke();hits.push({k:'obj',id:o[0],x:ox,y:oy-30,w:13,h:13})});
+ /* people */
+ const list=Object.values(SP).filter(s=>!s.hidden).sort((a,b)=>a.y-b.y);
+ list.forEach(sp=>{const hot=hover&&(hover.k==='npc'||hover.k==='chip')&&hover.id===sp.id;person(g,sp,hot);hits.push({k:'npc',id:sp.id,x:sp.x-11,y:sp.y-32,w:22,h:36})});
+ list.forEach(sp=>{tag(g,Math.round(sp.x),Math.round(sp.y)-36,first(sp.id),NPC_OF(sp.id).col)});
+ /* roster strip */
+ {let rx=12,ry=H-86;['hero',...Object.keys(NPCS)].forEach(id=>{const sp=SP[id];if(!sp)return;const lab=first(id)+' · '+SHORT[sp.want];g.font='12px "IBM Plex Mono",monospace';const need=g.measureText(lab).width+40;if(rx+need>W-12){rx=12;ry+=28}
+  const w=chip(g,rx,ry,lab,{dot:NPC_OF(id).col,h:24,stroke:id==='hero'?'#1f5a3b':hover&&hover.id===id?'#e3b552':'#2a3744',col:id==='hero'?'#38d27f':'#d9dfe5'});if(id!=='hero')hits.push({k:'chip',id,x:rx,y:ry,w,h:24});rx+=w+8});
+  const ts2=fmt(S.t);g.font='12px "IBM Plex Mono",monospace';chip(g,W-12-g.measureText(ts2).width-16,H-30,ts2,{h:24,col:S.t>=T('19:00')?'#e5594f':'#38d27f'})}
+ if(mouse&&hover&&hover.tip){g.font='12px "IBM Plex Mono",monospace';const lines=hover.tip,w=Math.max(...lines.map(t=>g.measureText(t).width))+16,h=lines.length*16+10;let tx=Math.min(W-w-6,mouse.x+14),ty=Math.max(6,mouse.y-h-8);
+  g.fillStyle='rgba(7,11,15,.96)';rr(g,tx,ty,w,h,2);g.fill();g.strokeStyle='#3a4856';g.stroke();g.textBaseline='middle';lines.forEach((t,i)=>{g.fillStyle=i?'#7a8794':'#fff';g.fillText(t,tx+8,ty+13+i*16)})}}
+function pick(e){const b=cv.getBoundingClientRect(),x=(e.clientX-b.left-VW.ox)/VW.s,y=(e.clientY-b.top-VW.oy)/VW.s;mouse={x,y};
+ for(let i=hits.length-1;i>=0;i--){const h=hits[i];if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){
+  const o={k:h.k,id:h.id};
+  if(h.id==='hero'){o.tip=['You (John Miller)','Private detective','Follows your cd. Now: '+TITLE[SP.hero.want]]}
+  else if(h.k==='npc'||h.k==='chip'){const N=NPCS[h.id],sp=SP[h.id];o.tip=[N.name,N.role,'Now: '+(TITLE[sp.want]||'Elsewhere')]}
+  else if(h.k==='room')o.tip=[TITLE[h.id],'click: observe '+ROOMS[h.id].dir];
+  else o.tip=[OB[h.id].label,'click: fill inspect'];
+  return o}}return null}
+cv.addEventListener('mousemove',e=>{hover=pick(e);cv.style.cursor=hover?'pointer':'default';wake()});
+cv.addEventListener('mouseleave',()=>{hover=null;mouse=null;wake()});
+cv.addEventListener('click',e=>{const h=pick(e);if(!h)return;
+ if(h.k==='obj'){setInput('inspect '+h.id);return}
+ if(menuOpen||introOn)return;
+ if(matchMedia('(pointer:coarse)').matches){if(h.k==='room')execLine(h.id==='street'?'cd ~':'cd locations/'+ROOMS[h.id].dir);else if(h.id!=='hero'&&npcLoc(h.id)===curRoom())execLine('talk '+h.id);return}
+ if(h.k==='room')execLine('observe '+ROOMS[h.id].dir);else if(h.id!=='hero')execLine('inspect '+h.id)});
+/* ===== MENU + SAVE SYSTEM ===== */
+/* Two layers: this browser (localStorage) and, when the viewer is signed in to claude.ai, a private per-person doc in the artifact db. The newer one wins. */
+let menuOpen=true,CL=null,cTimer=0,confirmNew=false;
+function stamp(ms){if(!ms)return'earlier';try{return new Date(ms).toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){return'earlier'}}
+function describe(sv){const ev=Object.keys(sv.found||{}).length;
+ const st=sv.flags&&sv.flags.end?'case closed':sv.done?'chapter '+(sv.ch||1)+' done':'investigating';
+ return 'Chapter '+(sv.ch||1)+' · case time '+fmt(sv.t)+' · '+ev+'/10 evidence · '+st+' · saved '+stamp(sv.savedAt)}
+async function initCloud(){try{
+  if(!window.claude||!window.claude.use)return;
+  const to=new Promise(r=>setTimeout(()=>r(null),6000));
+  const got=await Promise.race([Promise.all([claude.use('db'),claude.use('user')]),to]);
+  if(!got||!got[0]||!got[1])return;
+  const id=await got[1].id();if(!id)return;
+  CL={ref:got[0].collection('data/users/'+id).doc('save')};
+ }catch(e){CL=null}
+ if(menuOpen)updateMenu();else cloudSave()}
+async function cloudRead(){if(!CL)return null;try{const s=await CL.ref.get();if(!s.exists)return null;const d=s.data();const st=JSON.parse(d.json);if(!st||st.v!==2)return null;st.savedAt=st.savedAt||d.savedAt;return st}catch(e){return null}}
+function cloudSave(now){if(!CL||menuOpen||!S||S.savedAt==null)return;clearTimeout(cTimer);
+ const go=()=>{try{CL.ref.set({json:JSON.stringify(S),savedAt:S.savedAt,v:2}).catch(()=>{})}catch(e){}};
+ if(now)go();else cTimer=setTimeout(go,1500)}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)cloudSave(true)});
+addEventListener('pagehide',()=>cloudSave(true));
+let BEST=null;
+async function bestSave(){const l=loadSave(),c=await cloudRead();if(l&&c)return(c.savedAt||0)>(l.savedAt||0)?{sv:c,src:'account'}:{sv:l,src:'browser'};
+ return c?{sv:c,src:'account'}:l?{sv:l,src:'browser'}:null}
+async function updateMenu(){confirmNew=false;const bn=$('#bnew');bn.textContent='Start new game';bn.classList.remove('warn');$('#newinfo').textContent='';
+ const bc=$('#bcont'),ci=$('#continfo');bc.disabled=true;ci.textContent='Looking for a saved game...';
+ $('#cloudinfo').innerHTML=CL?'<b>Account save on.</b> Your progress follows you to other devices and later visits.':'Progress is saved automatically in this browser. Sign in to claude.ai to keep it on your account.';
+ BEST=await bestSave();if(!menuOpen)return;
+ if(BEST){bc.disabled=false;ci.textContent=describe(BEST.sv)+(BEST.src==='account'?' (account)':'')}else ci.textContent='No saved case yet.'}
+function showMenu(){if(S&&!menuOpen&&S.savedAt!=null){persist();cloudSave(true)}menuOpen=true;$('#menu').hidden=false;$('#app').inert=true;updateMenu();setTimeout(()=>{const b=$('#bcont').disabled?$('#bnew'):$('#bcont');b.focus()},30)}
+function hideMenu(){menuOpen=false;$('#menu').hidden=true;$('#app').inert=false;inp.focus();mirror()}
+$('#bnew').addEventListener('click',()=>{
+ if(BEST&&!confirmNew){confirmNew=true;const b=$('#bnew');b.textContent='Overwrite the saved game?';b.classList.add('warn');$('#newinfo').textContent='Click again to confirm. The old save will be replaced.';return}
+ hideMenu();boot(true)});
+$('#bcont').addEventListener('click',()=>{if(!BEST)return;const sv=BEST.sv;hideMenu();boot(false,sv)});
+$('#menubtn').addEventListener('click',showMenu);
+addEventListener('keydown',e=>{if(e.key==='Escape'){if(introOn)return;if(menuOpen){if(S&&S.savedAt!=null)hideMenu()}else showMenu()}});
+/* ===== INTRO CUTSCENE: Miller's office ===== */
+let introOn=false,SK=false,iDone=null,iRaf=0;
+const icv=$('#ic'),ig=icv.getContext('2d'),dwho=$('#dwho'),dtxt=$('#dtxt'),dhint=$('#dhint'),icard=$('#icard');
+const IW=720,IH=405;
+const A={miller:{x:545,y:335,face:-1,sit:1,walk:0,gest:0,talk:0,col:'#5d6f82',pants:'#2a313c',hair:'#2a1f16',hat:0,coat:0,tie:'#9a3a34',hide:0,wr:0},
+ emily:{x:64,y:348,face:1,sit:0,walk:0,gest:0,talk:0,col:'#3f7a68',pants:'#3a3140',hair:'#4a2f1c',long:1,hat:0,coat:1,tie:'#e0d6c4',hide:1,wr:0}};
+const P={door:0,photo:0,key:0,note:0,rackHat:1,rackCoat:1,dim:0};
+/* tweens + waits all resolve at once when skipped */
+let TW=[],WAITS=[];
+function tween(o,k,to,dur){return new Promise(res=>{if(SK||reduce||dur<=0){o[k]=to;res();return}TW.push({o,k,from:o[k],to,t0:performance.now(),dur,res})})}
+function tweenXY(a,x,y,dur){a.walk=1;const f=x>a.x?1:-1;if(x!==a.x)a.face=f;return Promise.all([tween(a,'x',x,dur),tween(a,'y',y,dur)]).then(()=>{a.walk=0})}
+function wait(ms){return new Promise(res=>{if(SK||reduce&&ms>400){res();return}const id=setTimeout(()=>{WAITS=WAITS.filter(w=>w!==ent);res()},ms),ent={id,res};WAITS.push(ent)})}
+function tickTW(now){TW=TW.filter(t=>{const p=Math.min(1,(now-t.t0)/t.dur),e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;t.o[t.k]=t.from+(t.to-t.from)*e;if(p>=1){t.res();return false}return true})}
+/* dialogue */
+let dState='idle',dFull='',dRes=null,dIv=0,dActor=null;
+function line(who,text,o){o=o||{};return new Promise(res=>{if(SK){res();return}
+ const a=A[who];const nm=who==='miller'?'JOHN MILLER':who==='emily'?'EMILY CARTER':who==='michael'?'MICHAEL CARTER':'';
+ dwho.textContent=nm;dwho.style.color=who==='miller'?'#e3b552':who==='emily'?'#7fd4b4':who==='michael'?'#e0a868':'#7a8794';dtxt.className=nm?'':'narr';dtxt.textContent='';dhint.style.visibility='hidden';
+ dFull=text;dRes=res;dState='type';dActor=a||null;if(a){a.talk=1;a.gest=o.gest==null?1:o.gest}
+ let i=0;clearInterval(dIv);
+ const done=()=>{clearInterval(dIv);dtxt.textContent=dFull;dState='wait';dhint.style.visibility='visible';if(dActor){dActor.talk=0;dActor.gest=0}};
+ if(reduce){done();return}
+ dIv=setInterval(()=>{i++;dtxt.textContent=dFull.slice(0,i);if(i>=dFull.length)done()},22)})}
+function advance1(){if(!introOn)return;if(dState==='type'){clearInterval(dIv);dtxt.textContent=dFull;dState='wait';dhint.style.visibility='visible';if(dActor){dActor.talk=0;dActor.gest=0}}
+ else if(dState==='wait'){dState='idle';dhint.style.visibility='hidden';const r=dRes;dRes=null;r&&r()}}
+function clearDlg(){dwho.textContent='';dtxt.textContent='';dhint.style.visibility='hidden'}
+async function card(t1,t2,ms){if(SK)return;icard.innerHTML='<b></b><span></span>';icard.firstChild.textContent=t1;icard.lastChild.textContent=t2||'';icard.className='on';await wait(ms||2200);icard.className='';await wait(500)}
+/* ---------- drawing ---------- */
+function fig(g,a,ts){if(a.hide)return;const x=a.x,y=a.y,f=a.face,sit=a.sit,hip=sit?y-20:y-36,sw=a.walk?Math.sin(ts/120):0;
+ const arm=a.talk&&a.gest?(.5+.5*Math.sin(ts/150)):0;
+ g.fillStyle='rgba(0,0,0,.35)';g.beginPath();g.ellipse(x,y+2,24,6,0,0,7);g.fill();
+ g.fillStyle=a.pants;
+ if(sit){g.fillRect(Math.min(x-8,x+f*22),hip-3,Math.abs(f*30)+8,12);const sx=x+f*22;g.fillRect(sx-6,hip,12,y-hip-4);g.fillStyle='#111';g.fillRect(sx-6+(f>0?1:-3),y-5,14,5)}
+ else[-1,1].forEach(i=>{const off=sw*i*9;g.fillStyle=a.pants;g.beginPath();g.moveTo(x+i*6-6,hip);g.lineTo(x+i*6+6,hip);g.lineTo(x+i*6+5+off,y-4);g.lineTo(x+i*6-5+off,y-4);g.fill();g.fillStyle='#111';g.fillRect(x+i*6-6+off+(f>0?2:-3),y-5,12,5)});
+ /* torso */
+ g.fillStyle=a.col;g.fillRect(x-15,hip-46,30,46+(a.coat&&!sit?16:0));g.fillStyle='rgba(255,255,255,.12)';g.fillRect(x-15,hip-46,30,3);
+ if(a.coat&&a.id!=='emily'){g.fillStyle='rgba(0,0,0,.2)';g.fillRect(x-1,hip-44,2,60)}
+ g.fillStyle='#e8e2d4';g.beginPath();g.moveTo(x-6,hip-46);g.lineTo(x+6,hip-46);g.lineTo(x,hip-30);g.fill();
+ if(a.tie){g.fillStyle=a.tie;if(a.long){g.fillRect(x-7,hip-47,14,4)}else{g.fillRect(x-2,hip-44,4,16)}}
+ /* arms */
+ g.lineCap='round';g.strokeStyle=a.col;g.lineWidth=10;
+ const sh=[x-15,hip-42],sh2=[x+15,hip-42];
+ const hand=(s,front)=>{let hx,hy;
+  if(a.walk){const k=sw*(s[0]<x?1:-1);hx=s[0]+(s[0]<x?-3:3);hy=hip-8+k*8}
+  else if(sit){hx=x+(front?f*(30+arm*12):-f*14);hy=front?(a.wr?hip-12+Math.sin(ts/90)*2:hip-14-arm*26):hip-8}
+  else{hx=s[0]+(front?f*(10+arm*22):(s[0]<x?-4:4));hy=front?hip-14-arm*30+(a.pose==='hold'?-14:0):hip-6}
+  if(a.pose==='shake'&&front){hx=x+f*36;hy=hip-24}
+  g.strokeStyle=a.col;g.lineWidth=10;g.beginPath();g.moveTo(s[0],s[1]);g.lineTo(hx,hy);g.stroke();g.fillStyle='#e0b894';g.beginPath();g.arc(hx,hy,5.5,0,7);g.fill()};
+ hand(f>0?sh:sh2,false);hand(f>0?sh2:sh,true);
+ /* head */
+ g.fillStyle='#d9ae8a';g.fillRect(x-6,hip-52,12,8);g.fillStyle='#e0b894';rr(g,x-13,hip-82,26,32,4);g.fill();
+ g.fillStyle=a.hair;g.fillRect(x-14,hip-84,28,10);if(a.long){g.fillRect(x-15,hip-84,6,38);g.fillRect(x+9,hip-84,6,38)}
+ if(a.hat&&!a.long){g.fillStyle='#3b3228';g.fillRect(x-21,hip-84,42,5);g.fillRect(x-13,hip-98,26,16);g.fillStyle='#8a2f2a';g.fillRect(x-13,hip-86,26,3)}
+ g.fillStyle='#1a1410';g.fillRect(x-7+f*3,hip-68,3,3);g.fillRect(x+4+f*3,hip-68,3,3);if(a.glasses){g.fillRect(x-9+f*3,hip-69,8,1);g.fillRect(x+2+f*3,hip-69,8,1)}
+ g.fillStyle=a.long?'#a8453f':'#8a5d44';g.fillRect(x-3+f*3,hip-58,7,a.talk&&Math.sin(ts/80)>0?3:1)}
+function scene(g,ts){
+ /* wall + floor */
+ g.fillStyle='#2b2f36';g.fillRect(0,0,IW,340);const wg=g.createLinearGradient(0,0,0,340);wg.addColorStop(0,'rgba(0,0,0,.35)');wg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=wg;g.fillRect(0,0,IW,340);
+ g.fillStyle='#232830';for(let x=0;x<IW;x+=36)g.fillRect(x,0,2,340);
+ g.fillStyle='#1b1e23';g.fillRect(0,330,IW,10);
+ const fg=g.createLinearGradient(0,340,0,IH);fg.addColorStop(0,'#4a3322');fg.addColorStop(1,'#2e1f15');g.fillStyle=fg;g.fillRect(0,340,IW,IH-340);
+ g.fillStyle='rgba(0,0,0,.25)';for(let x=-40;x<IW+40;x+=60){g.beginPath();g.moveTo(x,340);g.lineTo(x-(x-360)*.25,IH);g.lineTo(x-(x-360)*.25+2,IH);g.lineTo(x+2,340);g.fill()}
+ /* window with blinds + skyline */
+ const wx=470,wy=44,ww=180,wh=170;g.fillStyle='#10161f';g.fillRect(wx-6,wy-6,ww+12,wh+12);
+ const sk=g.createLinearGradient(0,wy,0,wy+wh);sk.addColorStop(0,'#c9a46e');sk.addColorStop(1,'#e9d4a6');g.fillStyle=sk;g.fillRect(wx,wy,ww,wh);
+ g.fillStyle='#4b5560';[[0,110,24,60],[28,90,30,80],[62,120,22,50],[88,70,34,100],[126,104,26,66],[156,84,24,86]].forEach(b=>g.fillRect(wx+b[0],wy+b[1],b[2],b[3]));
+ g.fillStyle='#3a434d';g.fillRect(wx+92,wy+30,5,40);g.fillRect(wx+84,wy+62,22,3);
+ g.fillStyle='rgba(30,26,22,.78)';for(let i=0;i<14;i++)g.fillRect(wx,wy+i*12+2,ww,6);
+ g.fillStyle='#10161f';g.fillRect(wx+ww/2-2,wy,4,wh);
+ g.fillStyle='rgba(255,226,160,.07)';for(let i=0;i<8;i++){g.beginPath();g.moveTo(wx-60+i*34,wy+wh+6);g.lineTo(wx-60+i*34+16,wy+wh+6);g.lineTo(wx-210+i*34+16,338);g.lineTo(wx-210+i*34,338);g.fill()}
+ /* wall decor */
+ g.fillStyle='#1a1d22';g.fillRect(205,78,64,50);g.fillStyle='#b9b09a';g.fillRect(209,82,56,42);g.fillStyle='#4a4a44';for(let i=0;i<5;i++)g.fillRect(214,90+i*7,46-(i%2)*14,2);g.fillStyle='#8a2f2a';g.fillRect(246,108,12,10);
+ g.fillStyle='#1a1d22';g.fillRect(300,60,44,44);g.fillStyle='#e8e2d4';g.fillRect(304,64,36,36);g.fillStyle='#8a2f2a';g.fillRect(304,64,36,9);g.fillStyle='#222';g.font='bold 9px "IBM Plex Mono",monospace';g.textBaseline='middle';g.fillText('OCT',311,68);g.font='bold 18px "IBM Plex Mono",monospace';g.fillText('30',312,87);
+ g.fillStyle='#d9d2bd';g.beginPath();g.arc(395,66,20,0,7);g.fill();g.strokeStyle='#1a1d22';g.lineWidth=3;g.stroke();g.strokeStyle='#222';g.lineWidth=2;g.beginPath();g.moveTo(395,66);g.lineTo(395,53);g.moveTo(395,66);g.lineTo(404,70);g.stroke();
+ /* door + hallway */
+ const dx=28,dy=160,dw=84,dh=180;g.fillStyle='#14181e';g.fillRect(dx-6,dy-6,dw+12,dh+6);
+ if(P.door>0.02){g.fillStyle='#46515c';g.fillRect(dx,dy,dw,dh);g.fillStyle='#2f3841';g.fillRect(dx,dy,dw,14);g.fillStyle='rgba(255,236,190,.16)';g.fillRect(dx,dy,dw,dh)}
+ const pw=Math.max(8,dw*(1-P.door*.9));g.fillStyle='#6a4a2e';g.fillRect(dx,dy,pw,dh);g.fillStyle='#8b6a46';g.fillRect(dx+pw-8,dy+90,5,5);
+ if(P.door<.3){g.fillStyle='#c9d3d6';g.fillRect(dx+10,dy+16,pw-20,60);g.fillStyle='#222';g.font='bold 10px "IBM Plex Mono",monospace';g.textAlign='center';g.fillText('J. MILLER',dx+pw/2,dy+34);g.font='8px "IBM Plex Mono",monospace';g.fillText('PRIVATE',dx+pw/2,dy+50);g.fillText('INVESTIGATOR',dx+pw/2,dy+62);g.textAlign='left'}
+ /* coat rack */
+ g.fillStyle='#2a1f16';g.fillRect(168,170,6,170);g.fillRect(150,336,42,6);g.fillRect(156,180,34,4);
+ if(P.rackHat){g.fillStyle='#3b3228';g.fillRect(150,166,32,5);g.fillRect(156,154,20,14);g.fillStyle='#8a2f2a';g.fillRect(156,164,20,3)}
+ if(P.rackCoat){g.fillStyle='#7a6340';g.fillRect(177,184,24,72);g.fillStyle='rgba(0,0,0,.2)';g.fillRect(188,186,2,70)}
+ /* filing cabinet */
+ g.fillStyle='#4d5b52';g.fillRect(664,200,48,140);g.fillStyle='#3a463f';for(let i=0;i<3;i++){g.fillRect(664,200+i*47,48,3);g.fillStyle='#9aa89e';g.fillRect(682,222+i*47,12,4);g.fillStyle='#3a463f'}
+ g.fillStyle='#d9d2bd';g.fillRect(668,184,26,16);g.fillRect(676,176,22,10);
+ /* Miller's chair */
+ g.fillStyle='#3a2318';rr(g,505,264,84,78,8);g.fill();g.fillStyle='#4a2d1f';rr(g,512,270,70,60,6);g.fill();
+ /* client chair (behind Emily) */
+ g.fillStyle='#5a3a24';g.fillRect(288,292,7,52);g.fillRect(288,330,64,9);g.fillRect(290,339,6,12);g.fillRect(344,339,6,12)}
+function desk(g,ts){
+ g.fillStyle='#3d2616';g.fillRect(392,302,274,54);g.fillStyle='#4f321e';g.fillRect(386,296,286,10);g.fillStyle='rgba(255,255,255,.08)';g.fillRect(386,296,286,2);
+ g.fillStyle='#2f1d11';g.fillRect(404,314,70,38);g.fillRect(560,314,92,38);g.fillStyle='#b69a62';g.fillRect(432,326,14,4);g.fillRect(598,326,14,4);
+ const ty=296;
+ /* props on top */
+ g.fillStyle='#4a4f56';g.fillRect(414,ty-18,36,18);g.fillStyle='#2a2e34';g.fillRect(418,ty-26,28,8);g.fillStyle='#d9d2bd';g.fillRect(426,ty-34,14,10);g.fillStyle='#888';g.fillRect(418,ty-14,28,2);
+ g.fillStyle='#1d2a22';g.fillRect(630,ty-6,24,6);g.fillStyle='#2f6a4c';g.beginPath();g.moveTo(628,ty-32);g.lineTo(656,ty-32);g.lineTo(650,ty-20);g.lineTo(634,ty-20);g.fill();g.fillStyle='#bfa66a';g.fillRect(641,ty-20,3,14);
+ g.fillStyle='rgba(255,226,150,.13)';g.beginPath();g.moveTo(634,ty-20);g.lineTo(650,ty-20);g.lineTo(680,ty);g.lineTo(604,ty);g.fill();
+ g.fillStyle='#222';g.fillRect(578,ty-12,28,12);g.fillStyle='#333';g.fillRect(582,ty-17,20,6);g.fillStyle='#777';g.fillRect(578,ty-12,28,2);
+ g.fillStyle='#d9d2bd';g.fillRect(468,ty-5,34,4);g.fillStyle='#cbc3ad';g.fillRect(471,ty-8,34,4);
+ g.fillStyle='#e8e2d4';g.fillRect(520,ty-8,12,8);g.fillStyle='#b9b09a';g.fillRect(520,ty-5,12,2);g.fillStyle='#7a2a24';g.fillRect(520,ty-8,12,2);
+ g.fillStyle='#c8c8c8';g.fillRect(540,ty-5,16,5);
+ if(!reduce){g.fillStyle='rgba(255,255,255,.28)';for(let i=0;i<3;i++){const yy=ty-12-((ts/40+i*9)%22);g.fillRect(522+Math.sin(ts/300+i)*2,yy,2,4)}}
+ g.fillStyle='#3a2a1a';g.fillRect(456,ty-30,0,0);
+ if(P.note){g.fillStyle='#e8e2d4';g.fillRect(486,ty-4,24,3);g.fillStyle='#222';g.fillRect(490,ty-3,12,1)}
+ if(P.photo){g.fillStyle='#f0ead8';g.save();g.translate(458,ty-6);g.rotate(-.1);g.fillRect(0,0,22,15);g.fillStyle='#7a8794';g.fillRect(2,2,18,11);g.restore()}
+ if(P.key){g.fillStyle='#d9b24a';g.fillRect(496,ty-6,10,3);g.beginPath();g.arc(494,ty-5,3,0,7);g.fill()}
+ g.fillStyle='#b69a62';g.fillRect(396,ty-1,40,3);g.fillStyle='#222';g.font='8px "IBM Plex Mono",monospace';g.textBaseline='middle';g.fillText('J.MILLER',398,ty+1)}
+let SCN='office';const SCENES={};
+function frameI(ts){iRaf=0;if(!introOn)return;tickTW(performance.now());const g=ig;g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,IW,IH);g.imageSmoothingEnabled=false;
+ A.miller.id='miller';A.emily.id='emily';if(A.michael)A.michael.id='michael';
+ (SCENES[SCN]||SCENES.office).draw(g,ts);
+ if(P.dim>0){g.fillStyle='rgba(5,8,12,'+P.dim+')';g.fillRect(0,0,IW,IH)}
+ iRaf=requestAnimationFrame(frameI)}
+SCENES.office={draw:(g,ts)=>{scene(g,ts);if(A.miller.sit||A.miller.y<A.emily.y){fig(g,A.miller,ts);desk(g,ts);fig(g,A.emily,ts)}else{desk(g,ts);fig(g,A.emily,ts);fig(g,A.miller,ts)}}};
+/* ---------- the script ---------- */
+async function script(){
+ await card('HARBOR CITY','Friday, October 30 · 9:40 AM',2300);
+ P.dim=0;
+ await wait(500);
+ A.miller.talk=0;
+ await line('',"The office of John Miller, Private Investigator. Third floor, a window that sticks, and a radiator that talks back.");
+ A.miller.wr=0;
+ await line('miller',"Another Friday. Another cold cup of coffee. Rent's due Monday and the phone hasn't rung since Tuesday.",{gest:0});
+ await line('',"[ KNOCK KNOCK ]");
+ await line('miller',"It's open.",{gest:0});
+ /* Emily enters */
+ await tween(P,'door',1,600);
+ A.emily.hide=0;A.emily.x=64;
+ await tween(A.miller,'sit',0,0);A.miller.y=335;
+ await tweenXY(A.emily,150,348,1100);await wait(250);
+ await line('emily',"Mr. Miller? John Miller?",{gest:0});
+ await line('miller',"That's what the glass on the door says. Come in, miss. Mind the stack by the chair, it bites.");
+ await tween(P,'door',0,500);
+ await tweenXY(A.emily,330,348,1600);
+ await line('emily',"My name is Emily Carter. I didn't know where else to go.");
+ A.miller.pose='';await line('miller',"Sit down. Start at the beginning.");
+ A.miller.sit=1;A.miller.y=335;A.emily.sit=1;A.emily.x=326;
+ await wait(300);
+ await line('emily',"It's my brother, Michael. He's a reporter at the Harbor Courier. He's been missing since Tuesday night.");
+ await line('miller',"Missing how? Sulking at a friend's place, skipped town, or really gone?");
+ await line('emily',"Gone. Michael calls me every night at nine, Mr. Miller. Every night, since our parents died. Wednesday, nothing. Thursday, nothing.");
+ A.miller.wr=1;P.note=1;
+ await line('miller',"Did you go to the police?");
+ await line('emily',"Yesterday. A desk sergeant took the report and said grown men vanish all the time. Nobody has even been to his office.");
+ await line('miller',"His office. Where does he work?");
+ await line('emily',"The old Bennett Building, on Dock Street. The Courier rents the second floor. Michael had been working late there for weeks, digging into some real estate deal. He said it was crooked, and that the people behind it were friendly with the right people.");
+ await line('miller',"Names?");
+ await line('emily',"Richard Bennett, who owns the building. A coworker, David Wilson. And the night guard, James Parker. Parker knows everyone who comes and goes.");
+ await line('miller',"Enemies? Debts? A girl?");
+ await line('emily',"No. Just the story. He told me, “Em, if this breaks, it breaks the whole harbor.”");
+ A.miller.wr=0;
+ P.photo=1;P.key=1;
+ await line('',"Emily sets a photograph and a brass key on the desk.");
+ await line('emily',"That's Michael. And the key to his apartment on Orchard Street. I went in once. I couldn't touch anything.");
+ await line('miller',"Fifty a day, plus expenses. I don't promise happy endings, Miss Carter. Only answers.",{gest:0});
+ await line('emily',"I don't care what it costs. I just need him back.");
+ await tween(A.miller,'sit',0,0);A.miller.sit=0;
+ await line('miller',"Then you've got yourself a detective. Go home and stay by the phone. If he calls, you call me. I'll start at the Bennett Building.");
+ A.emily.sit=0;A.emily.x=340;
+ await wait(250);
+ /* handshake */
+ A.miller.pose='shake';A.emily.pose='shake';
+ await tweenXY(A.miller,420,348,700);A.miller.face=-1;
+ await wait(900);
+ P.photo=0;P.key=0;
+ await line('',"Miller pockets the photo and the key.");
+ A.miller.pose='';A.emily.pose='';
+ await tweenXY(A.miller,560,335,700);A.miller.face=-1;
+ await line('emily',"Thank you, Mr. Miller. Please be careful. Michael said that building has ears.");
+ /* Emily leaves */
+ await tweenXY(A.emily,100,348,1700);
+ A.emily.face=-1;
+ await tween(P,'door',1,500);
+ await line('emily',"Find him.",{gest:0});
+ await tweenXY(A.emily,64,348,600);
+ A.emily.hide=1;await tween(P,'door',0,500);
+ await wait(500);
+ /* Miller prepares */
+ A.miller.face=-1;
+ await line('miller',"Bennett Building. A guard who sees everything, a landlord who owns everything, and a reporter who stopped calling his sister.",{gest:0});
+ await tweenXY(A.miller,420,348,900);
+ await tweenXY(A.miller,230,348,1500);
+ A.miller.face=-1;await wait(300);
+ P.rackHat=0;A.miller.hat=1;await wait(450);
+ P.rackCoat=0;A.miller.coat=1;A.miller.col='#7a6340';await wait(600);
+ await line('miller',"Hat, coat, notebook. Let's see what Michael Carter found.");
+ await tweenXY(A.miller,110,348,1400);
+ await tween(P,'door',1,500);
+ await tweenXY(A.miller,64,348,500);
+ A.miller.hide=1;
+ await tween(P,'dim',1,900);
+ clearDlg();
+ await card('CASE #001','The Missing Reporter',2600)}
+SCENES.office.reset=()=>{Object.assign(A.miller,{x:545,y:335,face:-1,sit:1,walk:0,gest:0,talk:0,col:'#5d6f82',hat:0,coat:0,hide:0,wr:0,pose:''});
+ Object.assign(A.emily,{x:64,y:348,face:1,sit:0,walk:0,gest:0,talk:0,hide:1,pose:''});Object.assign(P,{door:0,photo:0,key:0,note:0,rackHat:1,rackCoat:1,dim:1})};
+SCENES.office.script=()=>script();
+async function playScene(id,done){iDone=done||null;
+ if(introOn)return;introOn=true;SK=false;TW=[];WAITS=[];SCN=SCENES[id]?id:'office';delete A.michael;
+ SCENES[SCN].reset();
+ clearDlg();icard.className='';$('#intro').hidden=false;$('#app').inert=true;$('#iskip').focus({preventScroll:true});
+ if(!iRaf)iRaf=requestAnimationFrame(frameI);
+ tween(P,'dim',0,700);
+ try{await SCENES[SCN].script()}catch(e){}
+ endIntro()}
+const playIntro=done=>playScene('office',done);
+function endIntro(){if(!introOn)return;introOn=false;SK=false;clearInterval(dIv);dState='idle';TW=[];
+ $('#intro').hidden=true;icard.className='';$('#app').inert=false;if(S)S.flags.intro=1;
+ const d=iDone;iDone=null;d&&d()}
+function skipIntro(){if(!introOn)return;SK=true;clearInterval(dIv);dState='idle';TW.forEach(t=>{t.o[t.k]=t.to;t.res()});TW=[];WAITS.forEach(w=>{clearTimeout(w.id);w.res()});WAITS=[];if(dRes){const r=dRes;dRes=null;r()}}
+$('#iskip').addEventListener('click',e=>{e.stopPropagation();skipIntro()});
+$('#intro').addEventListener('click',advance1);
+addEventListener('keydown',e=>{if(!introOn)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();advance1()}else if(e.key==='Escape'){e.preventDefault();skipIntro()}},true);
+/* ===== CHAPTER CINEMATICS + ENDING SCENES (use the intro machinery in p4e.js) ===== */
+let END_ID='A';
+const grad=(g,y0,y1,c0,c1)=>{const gr=g.createLinearGradient(0,y0,0,y1);gr.addColorStop(0,c0);gr.addColorStop(1,c1);g.fillStyle=gr;g.fillRect(0,y0,IW,y1-y0)};
+const glow=(g,x,y,r,col)=>{const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,col);gr.addColorStop(1,col.replace(/[\d.]+\)$/,'0)'));g.fillStyle=gr;g.fillRect(x-r,y-r,r*2,r*2)};
+const coatOn=a=>Object.assign(a,{col:'#7a6340',hat:1,coat:1});
+const reset3=()=>{Object.assign(A.miller,{x:-70,y:372,face:1,sit:0,walk:0,gest:0,talk:0,hide:0,wr:0,pose:'',pants:'#2a313c'});coatOn(A.miller);
+ Object.assign(A.emily,{x:790,y:372,face:-1,sit:0,walk:0,gest:0,talk:0,hide:1,pose:'',col:'#3f7a68',coat:1});P.dim=1;P.door=0};
+/* ---- chapter 2: the pier at night ---- */
+SCENES.pier={reset:reset3,
+ draw(g,ts){grad(g,0,270,'#060b16','#22354a');for(let i=0;i<40;i++){g.fillStyle='rgba(220,230,255,'+(.25+.25*Math.sin(ts/700+i))+')';g.fillRect((i*83)%IW,(i*37)%150,1.5,1.5)}
+  glow(g,600,70,70,'rgba(210,225,255,.35)');g.fillStyle='#dfe7f2';g.beginPath();g.arc(600,70,20,0,7);g.fill();
+  g.fillStyle='#0b121b';for(let i=0;i<14;i++)g.fillRect(i*54,215-((i*29)%40),44,60);g.fillStyle='rgba(240,200,110,.7)';for(let i=0;i<20;i++)g.fillRect(8+i*36,228+(i%3)*8,3,3);
+  grad(g,262,340,'#0a1626','#0f2236');g.fillStyle='rgba(180,200,230,.35)';for(let i=0;i<18;i++){const wy=268+(i*11)%66;g.fillRect(((i*71+ts/25)%IW),wy,26,1)}g.fillStyle='rgba(220,230,255,.25)';for(let i=0;i<8;i++)g.fillRect(596+Math.sin(ts/400+i)*8,266+i*9,8+i*2,2);
+  g.fillStyle='#10161f';g.fillRect(430,104,280,236);g.fillStyle='#0a0f16';g.beginPath();g.moveTo(420,106);g.lineTo(570,60);g.lineTo(720,106);g.fill();
+  g.fillStyle='#d9b24a';g.fillRect(540,74,60,48);g.fillStyle='#10161f';g.font='bold 40px "IBM Plex Mono",monospace';g.textAlign='center';g.textBaseline='middle';g.fillText('9',570,100);g.textAlign='left';glow(g,570,98,70,'rgba(255,215,110,.28)');
+  g.fillStyle='#1a2230';for(let i=0;i<3;i++)g.fillRect(450+i*60,170,34,26);g.fillStyle='rgba(255,220,130,.9)';g.fillRect(630,176,30,20);
+  g.fillStyle='#2e3e50';g.fillRect(540,232,70,108);glow(g,575,300,110,'rgba(255,225,150,.25)');g.fillStyle='#2e3e50';g.fillRect(573,232,4,108);
+  g.fillStyle='#3a2a1c';g.fillRect(0,338,IW,70);g.fillStyle='#2a1e14';for(let i=-4;i<22;i++){g.beginPath();g.moveTo(i*38,338);g.lineTo(i*38+3,338);g.lineTo(i*58-IW*.12+3,IH);g.lineTo(i*58-IW*.12,IH);g.fill()}for(let j=0;j<4;j++)g.fillRect(0,348+j*16,IW,1);
+  [[90,330],[320,330]].forEach(p=>{g.fillStyle='#14110e';g.fillRect(p[0]-2,p[1]-170,4,170);g.fillRect(p[0]-2,p[1]-170,22,3);glow(g,p[0]+16,p[1]-160,64,'rgba(255,215,120,.35)')});
+  g.fillStyle='#24190f';[[210,348],[480,352]].forEach(p=>{g.fillRect(p[0],p[1]-26,12,26);g.fillRect(p[0]-2,p[1]-28,16,4)});
+  fig(g,A.miller,ts);
+  for(let i=0;i<5;i++){const fx=((ts/55+i*180)%(IW+400))-200,fy=250+i*30;glow(g,fx,fy,150,'rgba(190,205,220,.14)')}}};
+SCENES.pier.script=async()=>{await card('CHAPTER 2','HARBOR POINT · Friday, 8:30 PM',2600);tween(P,'dim',0,700);await wait(600);
+ await line('',"Friday night. The fog comes in off the harbor like it has somewhere to be.");
+ await tweenXY(A.miller,270,372,3000);
+ await line('miller',"Pier 4. Warehouse 9. Tuesday, eleven PM. “Archive crates, two, plus personal.”");
+ await line('miller',"Crates don't need a “plus personal”. People do.",{gest:1});
+ await wait(300);
+ await line('miller',"Signed M.H. Let's find out who that is before he finds me.",{gest:0});
+ await tween(P,'dim',1,900);clearDlg()};
+/* ---- chapter 3: City Hall at dawn ---- */
+SCENES.hall={reset(){reset3();A.emily.hide=0;A.emily.x=790;A.emily.pose='hold'},
+ draw(g,ts){grad(g,0,300,'#7aa4cc','#f2b685');glow(g,110,270,200,'rgba(255,200,130,.55)');g.fillStyle='rgba(255,255,255,.55)';[[60,60,90],[300,40,120],[520,80,100]].forEach((c,i)=>g.fillRect(((c[0]+ts/40*(i+1)*.4)%(IW+160))-80,c[1],c[2],12));
+  g.fillStyle='#b9ae98';g.fillRect(0,296,IW,70);g.fillStyle='#c9bfa8';g.fillRect(190,150,380,190);g.fillStyle='#b5ab94';g.fillRect(180,142,400,12);g.fillStyle='#c9bfa8';g.beginPath();g.moveTo(190,150);g.lineTo(380,92);g.lineTo(570,150);g.fill();g.fillStyle='#b5ab94';g.beginPath();g.moveTo(230,146);g.lineTo(380,102);g.lineTo(530,146);g.fill();
+  g.fillStyle='#ddd5c0';for(let i=0;i<6;i++)g.fillRect(212+i*62,158,22,170);g.fillStyle='#6a5a44';g.fillRect(350,230,60,100);g.fillStyle='#2b2418';g.fillRect(354,236,52,94);
+  g.fillStyle='#b5ab94';g.fillRect(340,20,80,76);g.fillStyle='#e8e0cc';g.beginPath();g.arc(380,56,26,0,7);g.fill();g.strokeStyle='#222';g.lineWidth=3;g.beginPath();g.moveTo(380,56);g.lineTo(380,38);g.moveTo(380,56);g.lineTo(392,64);g.stroke();
+  g.fillStyle='#7a1f1a';g.fillRect(378,0,2,22);g.fillRect(380,2,16,10);
+  g.fillStyle='#968c78';for(let i=0;i<4;i++)g.fillRect(170-i*10,330+i*8,420+i*20,8);
+  g.fillStyle='#8a8678';g.fillRect(0,362,IW,50);g.fillStyle='rgba(0,0,0,.12)';for(let i=0;i<IW;i+=60)g.fillRect(i,362,1,50);
+  g.fillStyle='#2a2a30';for(let i=0;i<7;i++){const px=(i*113+ts/18*(i%2?1:-1)+IW*4)%IW,py=392+(Math.sin(ts/150+i)>.8?-3:0);g.fillRect(px,py,8,4);g.fillRect(px+5,py-3,4,3)}
+  fig(g,A.miller,ts);fig(g,A.emily,ts)}};
+SCENES.hall.script=async()=>{await card('CHAPTER 3','THE CLERK · Saturday, 8:30 AM',2600);tween(P,'dim',0,700);await wait(500);
+ await line('',"Saturday morning. City Hall. Seven hours of sleep, and four of them in a chair.");
+ await tweenXY(A.miller,230,372,1800);
+ await tweenXY(A.emily,330,372,2200);A.emily.face=-1;
+ await line('emily',"I brought coffee. Black, like the files.");
+ await line('miller',"Michael's note says Farrow's signature doesn't match his card on file. The records room opens at nine.");
+ await line('emily',"You think the clerk forged them?");
+ await line('miller',"I think somebody wanted us to think so. Or somebody made him. Either way, Farrow knows.",{gest:1});
+ await line('emily',"I'll wait at Rosie's Diner. If there's anything. Anything at all.");
+ await line('miller',"Stay out of sight. Hale's people know your face.",{gest:0});
+ A.emily.pose='';await tweenXY(A.emily,790,372,2200);
+ await line('miller',"Let's see what a clerk is afraid of.");
+ await tweenXY(A.miller,372,372,1200);
+ await tween(P,'dim',1,900);clearDlg()};
+/* ---- chapter 4: the cannery in the rain ---- */
+SCENES.cannery={reset(){reset3();A.miller.x=70;A.miller.face=1;A.emily.hide=0;A.emily.x=40;A.emily.face=1;A.emily.pose='';A.emily.coat=1;A.emily.col='#3f7a68'},
+ draw(g,ts){grad(g,0,300,'#04070b','#161e29');const fl=(ts%7600)<140||((ts%7600)>260&&(ts%7600)<330);
+  if(fl){g.fillStyle='rgba(220,230,255,.18)';g.fillRect(0,0,IW,IH);g.strokeStyle='rgba(235,240,255,.9)';g.lineWidth=2;g.beginPath();g.moveTo(520,0);g.lineTo(500,40);g.lineTo(520,60);g.lineTo(490,110);g.stroke()}
+  g.fillStyle='#10151c';g.fillRect(280,130,360,210);g.fillStyle='#0b1016';g.fillRect(270,120,380,14);g.fillRect(596,20,34,112);g.fillStyle=Math.sin(ts/500)>0?'#e5594f':'#4a1a18';g.fillRect(608,12,10,10);
+  for(let r=0;r<2;r++)for(let c=0;c<7;c++){const lit=(r*7+c)%5===2;g.fillStyle=lit?'rgba(255,214,120,'+(.55+.15*Math.sin(ts/260+c))+')':'#1b2530';g.fillRect(300+c*48,160+r*60,26,30)}
+  g.fillStyle='#1c242e';g.fillRect(420,250,80,90);g.fillStyle='rgba(255,230,150,.8)';g.fillRect(428,262,2,66);glow(g,460,320,90,'rgba(255,225,150,.2)');
+  g.fillStyle='#1d1a14';g.fillRect(0,336,IW,70);g.fillStyle='rgba(140,170,200,.22)';[[120,370,60],[330,380,50],[560,372,70]].forEach(p=>{g.beginPath();g.ellipse(p[0],p[1],p[2],6,0,0,7);g.fill()});
+  g.strokeStyle='#47505a';g.lineWidth=1;for(let x=170;x<290;x+=10){g.beginPath();g.moveTo(x,250);g.lineTo(x+14,338);g.moveTo(x+14,250);g.lineTo(x,338);g.stroke()}g.fillStyle='#47505a';g.fillRect(170,248,120,3);
+  g.fillStyle='#2b3b57';g.fillRect(8,318,80,32);g.fillStyle='#3d5578';g.fillRect(24,300,46,22);glow(g,92,336,90,'rgba(255,236,170,.4)');g.fillStyle='#ffe6a0';g.fillRect(86,326,4,6);
+  fig(g,A.miller,ts);fig(g,A.emily,ts);
+  g.strokeStyle='rgba(170,195,220,.45)';g.lineWidth=1;g.beginPath();for(let i=0;i<150;i++){const rx=(i*97+ts/3)%IW,ry=((i*53)+ts*.95)%IH;g.moveTo(rx,ry);g.lineTo(rx-3,ry+10)}g.stroke()}};
+SCENES.cannery.script=async()=>{await card('CHAPTER 4','THE LAST EDITION · Saturday, 8:30 PM',2600);tween(P,'dim',0,700);await wait(500);
+ await line('',"Saturday night. Rain, and a cannery that has been dead since 2019. Somebody left the lights on.");
+ await tweenXY(A.miller,210,372,1800);await tweenXY(A.emily,150,372,1800);A.miller.face=1;
+ await line('emily',"I'm coming in with you.");
+ await line('miller',"No. You stay in the car, with the doors locked.",{gest:1});
+ await line('emily',"He's my brother.");
+ await line('miller',"Then stay in the car, so I can bring him to you.",{gest:0});
+ await wait(300);
+ await line('emily',"All my life I've read his stories. Tonight I'm in one.");
+ await line('miller',"Ten o'clock. Bennett, Hale, a guard on the fence. If I'm not out by midnight, call Harris.");
+ A.emily.face=1;await tweenXY(A.emily,90,372,1200);A.emily.face=1;
+ await tweenXY(A.miller,320,372,2000);
+ await tween(P,'dim',1,900);clearDlg()};
+/* ---- endings: the press room ---- */
+SCENES.press={reset(){const E=ENDINGS[END_ID];reset3();A.miller.x=230;A.miller.y=372;A.miller.face=1;A.miller.coat=0;A.miller.hat=0;A.miller.col='#5d6f82';A.emily.hide=END_ID==='A'||END_ID==='C'?0:1;A.emily.x=140;A.emily.face=1;A.emily.col='#3f7a68';A.emily.coat=1;
+  A.michael={id:'michael',x:520,y:372,face:-1,sit:0,walk:0,gest:0,talk:0,col:'#a77a4a',pants:'#3a3a40',hair:'#4a3a2a',long:0,hat:0,coat:0,tie:'#8c2f2f',hide:!(END_ID==='A'||END_ID==='B'||END_ID==='D'),glasses:1,pose:''};
+  if(END_ID==='C'){A.miller.x=320;A.emily.x=180}if(END_ID==='D'){A.miller.x=330;A.emily.hide=1}if(END_ID==='B'){A.miller.x=300;A.michael.x=420}},
+ draw(g,ts){const E=ENDINGS[END_ID],tone=E.tone;grad(g,0,IH,tone==='bad'?'#10141a':tone==='dark'?'#1a1710':'#1c1812',tone==='bad'?'#1b222b':'#2a2218');
+  g.fillStyle='#14110c';g.fillRect(0,330,IW,75);g.fillStyle='rgba(255,255,255,.04)';for(let i=0;i<IW;i+=48)g.fillRect(i,330,1,75);
+  for(let k=0;k<3;k++){const cx=90+k*270,cy=190;g.fillStyle='#2e3640';g.beginPath();g.arc(cx,cy,64,0,7);g.fill();g.strokeStyle='#58626e';g.lineWidth=5;g.beginPath();g.arc(cx,cy,56,0,7);g.stroke();g.lineWidth=3;for(let i=0;i<6;i++){const a=i*Math.PI/3+(tone==='bad'?0:ts/500);g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+Math.cos(a)*54,cy+Math.sin(a)*54);g.stroke()}g.fillStyle='#8a929c';g.beginPath();g.arc(cx,cy,10,0,7);g.fill()}
+  g.fillStyle='#2a2d33';g.fillRect(0,300,IW,34);const sx=tone==='bad'?0:(ts/6)%90;g.fillStyle='#e8e0c8';for(let i=-1;i<9;i++)g.fillRect(i*90-sx,306,64,22);g.fillStyle='rgba(0,0,0,.35)';for(let i=-1;i<9;i++)g.fillRect(i*90-sx+6,312,52,2);
+  const bx=206,by=44;g.save();g.translate(bx+156,by+120);g.rotate(tone==='bad'?-.03:.01);g.translate(-156,-120);
+  g.fillStyle='#ece4cc';g.fillRect(0,0,312,236);g.fillStyle='rgba(0,0,0,.08)';g.fillRect(0,0,312,4);
+  g.fillStyle='#1c1812';g.font='bold italic 22px Georgia,serif';g.textAlign='center';g.textBaseline='middle';g.fillText('THE HARBOR COURIER',156,24);g.fillRect(14,40,284,2);
+  const words=E.head.split(' ');let lines=[],cur='';g.font='bold 24px Georgia,serif';words.forEach(w=>{const t=cur?cur+' '+w:w;if(g.measureText(t).width>270){lines.push(cur);cur=w}else cur=t});lines.push(cur);
+  lines.forEach((l,i)=>g.fillText(l,156,70+i*28));g.font='italic 13px Georgia,serif';g.fillStyle='#4a4234';g.fillText(E.sub,156,70+lines.length*28+8);
+  g.fillStyle='#a79e88';for(let i=0;i<9;i++){g.fillRect(16,170+i*6,i%3===0?200:272,2)}g.fillStyle='#8a8272';g.fillRect(222,150,74,52);
+  g.restore();g.textAlign='left';
+  if(tone==='good')glow(g,360,200,260,'rgba(255,214,140,.14)');
+  fig(g,A.emily,ts);fig(g,A.michael,ts);fig(g,A.miller,ts);
+  if(END_ID==='D'){g.fillStyle='#e8dfb6';g.fillRect(380,340,46,22);g.strokeStyle='#8a7a3a';g.strokeRect(380.5,340.5,45,21);g.fillStyle='#8a7a3a';g.fillRect(398,346,10,8)}
+  if(tone==='bad'){g.fillStyle='rgba(10,20,40,.28)';g.fillRect(0,0,IW,IH)}}};
+SCENES.press.script=async()=>{const E=ENDINGS[END_ID];P.dim=1;await wait(200);tween(P,'dim',0,900);await wait(800);
+ const S2={
+ A:async()=>{await line('',"Sunday, 5:40 AM. The Courier press room. The ink is still wet.");
+  await line('michael',"Page one, above the fold. They spelled my name right.");
+  await line('emily',"Gloria says your first story had eleven typos, Mike.");
+  await line('michael',"Twelve.");
+  await line('miller',"Nobody prints the typos on the front page.",{gest:1});
+  await line('emily',"Thank you, Mr. Miller. For all of it.");
+  await line('miller',"Send the bill to Bennett's lawyers.",{gest:0})},
+ B:async()=>{await line('',"Sunday morning. The Courier prints what it can prove. It is a good story, and not the whole one.");
+  await line('michael',"Half a story is better than none. I'll write the rest from a desk with a window.");
+  await line('miller',"I'm keeping the file open, Carter. Bennett isn't done, and neither am I.");
+  await line('michael',"Tell Emily to stop calling me every hour.");
+  await line('miller',"Tell her yourself. She's outside, and she isn't leaving.")},
+ C:async()=>{await line('',"Sunday dawn. A page of the Courier, and no good news on it.");
+  await line('emily',"The cold room was empty, wasn't it.");
+  await line('miller',"They moved him before midnight. I'm sorry.");
+  await line('emily',"Don't be sorry. Keep looking.",{gest:0});
+  await line('miller',"I will. As long as it takes.")},
+ D:async()=>{await line('',"Monday morning. A paid advertisement on page five: a smiling skyline and the words HARBOR POINT.");
+  await line('miller',"Fifty thousand dollars. It weighs a lot more than paper.");
+  await line('',"Michael walked out alive, and promised never to write a word about it. Emily has not called.");
+  await line('miller',"Some deals you never really finish paying for.")}};
+ await S2[END_ID]();
+ await tween(P,'dim',1,1000);clearDlg();
+ await card('THE END','ENDING '+END_ID+': '+E.t,3600)};
+function chapterStart(n){flush();clearOut();playScene(CH.scene,()=>{persist();cloudSave(true);enqueue(CH.banner);refresh();nbToggle(innerWidth>860);if(!COARSE){inp.focus();mirror()}})}
+function endingStart(id){END_ID=id;playScene('press',()=>{persist();cloudSave(true);refresh()})}
+/* ===== DETECTIVE'S NOTEBOOK (to-do list) ===== */
+function todoItems(){return CH.todo.map(x=>({g:x.g,t:x.t,w:x.w,done:!!x.d(),open:!x.s||!!x.s()}))}
+function todoCount(){const a=todoItems();return[a.filter(x=>x.done).length,a.length]}
+function todoRender(){const box=$('#nbbody');if(!box)return;box.textContent='';const items=todoItems();let cur='';
+ items.forEach(it=>{if(it.g!==cur){cur=it.g;const h=document.createElement('div');h.className='nbg';h.textContent=cur;box.append(h)}
+  const r=document.createElement('div');r.className='nbi'+(it.done?' done':'')+(it.open?'':' dim');const b=document.createElement('span');b.className='bx';b.textContent=it.done?'\u2611':'\u2610';const t=document.createElement('span');t.className='tx';t.textContent=it.t;r.append(b,t);
+  if(!it.done){const w=document.createElement('button');w.type='button';w.className='nbw';w.textContent=it.w.split('  /  ')[0];w.title='Put this command in the terminal';w.addEventListener('click',()=>{setInput(it.w.split('  /  ')[0]+(/ (cat|inspect|use|take|talk)$/.test(' '+it.w.split('  /  ')[0])?'':''))});r.append(w)}
+  box.append(r)});
+ const c=todoCount();$('#nbcount').textContent=c[0]+' / '+c[1];
+ if(S.done){const f=document.createElement('div');f.className='nbg';f.textContent=PACKS[CH.n+1]?'Next':'Case closed';box.append(f);const r=document.createElement('div');r.className='nbi';const bx=document.createElement('span');bx.className='bx';bx.textContent='\u279C';const tx=document.createElement('span');tx.className='tx';tx.textContent=PACKS[CH.n+1]?'Chapter '+(CH.n+1)+': type next':'Ending '+(S.flags.end||'')+'. Open the menu to play again.';r.append(bx,tx);box.append(r)}}
+function nbToggle(on){const n=$('#nb');const v=on==null?n.hidden:on;n.hidden=!v;$('#nbbtn').setAttribute('aria-expanded',String(v));if(v)todoRender()}
+$('#nbbtn').addEventListener('click',()=>nbToggle());
+$('#nbclose').addEventListener('click',()=>nbToggle(false));
+/* ===== BOOT ===== */
+function banner(){enqueue(CH.banner)}
+function boot(fresh,sv){flush();clearOut();for(const k in SP)delete SP[k];
+ if(sv){applyPack(sv.ch||1);S=sv;persist();enqueue([['CASE FILE RESTORED  (Chapter '+CH.n+')  '+fmt(S.t),'c-ok'],['Type journal, status or help. Use reset confirm to start over.','c-dim'],['','']]);refresh();resize();cloudSave(true);if(!menuOpen){inp.focus();mirror()}return}
+ applyPack(1);S=newState();persist();refresh();resize();cloudSave(true);
+ playIntro(()=>{persist();cloudSave(true);banner();refresh();nbToggle(innerWidth>860);if(!COARSE){inp.focus();mirror()}})}
+/* the menu opens first; a throwaway state sits behind it so the map is alive */
+S=newState();mapSync();resize();refresh();showMenu();initCloud();
+</script>
+
+</body></html>
