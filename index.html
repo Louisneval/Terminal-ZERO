@@ -1115,7 +1115,7 @@ function mirror(){const v=inp.value,p=inp.selectionStart==null?v.length:inp.sele
  if(after.previousSibling!==c)cmdEl.insertBefore(c,after)}
 inp.addEventListener('input',mirror);inp.addEventListener('keyup',mirror);inp.addEventListener('click',mirror);
 inp.addEventListener('keydown',e=>{
- if(e.key==='Enter'){const v=inp.value;inp.value='';mirror();execLine(v)}
+ if(e.key==='Enter'){e.preventDefault();const v=inp.value;inp.value='';mirror();execLine(v)}
  else if(e.key==='ArrowUp'){if(hi>0){hi--;inp.value=hist[hi]||''}e.preventDefault();setTimeout(mirror)}
  else if(e.key==='ArrowDown'){if(hi<hist.length){hi++;inp.value=hist[hi]||''}e.preventDefault();setTimeout(mirror)}
  else if(e.key==='Tab'){e.preventDefault();doTab();mirror()}
@@ -1586,7 +1586,7 @@ SCENES.office.reset=()=>{Object.assign(A.miller,{x:545,y:335,face:-1,sit:1,walk:
  Object.assign(A.emily,{x:64,y:348,face:1,sit:0,walk:0,gest:0,talk:0,hide:1,pose:''});Object.assign(P,{door:0,photo:0,key:0,note:0,rackHat:1,rackCoat:1,dim:1})};
 SCENES.office.script=()=>script();
 async function playScene(id,done){iDone=done||null;
- if(introOn)return;introOn=true;SK=false;TW=[];WAITS=[];SCN=SCENES[id]?id:'office';delete A.michael;
+ if(introOn)return;introOn=true;SK=false;window.__sceneT=performance.now();TW=[];WAITS=[];SCN=SCENES[id]?id:'office';delete A.michael;
  SCENES[SCN].reset();
  clearDlg();icard.className='';$('#intro').hidden=false;$('#app').inert=true;$('#iskip').focus({preventScroll:true});
  if(!iRaf)iRaf=requestAnimationFrame(frameI);
@@ -1598,7 +1598,7 @@ function endIntro(){if(!introOn)return;introOn=false;SK=false;clearInterval(dIv)
  $('#intro').hidden=true;icard.className='';$('#app').inert=false;if(S)S.flags.intro=1;
  const d=iDone;iDone=null;d&&d()}
 function skipIntro(){if(!introOn)return;SK=true;clearInterval(dIv);dState='idle';TW.forEach(t=>{t.o[t.k]=t.to;t.res()});TW=[];WAITS.forEach(w=>{clearTimeout(w.id);w.res()});WAITS=[];if(dRes){const r=dRes;dRes=null;r()}}
-$('#iskip').addEventListener('click',e=>{e.stopPropagation();skipIntro()});
+$('#iskip').addEventListener('click',e=>{e.stopPropagation();if(performance.now()-(window.__sceneT||0)<700)return;skipIntro()});
 $('#intro').addEventListener('click',advance1);
 addEventListener('keydown',e=>{if(!introOn)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();advance1()}else if(e.key==='Escape'){e.preventDefault();skipIntro()}},true);
 /* ===== CHAPTER CINEMATICS + ENDING SCENES (use the intro machinery in p4e.js) ===== */
